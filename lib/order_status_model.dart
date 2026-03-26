@@ -6,14 +6,14 @@ class Order {
   final List<CartItem> items;
   final double total;
   final DateTime orderDate;
-  String status; // e.g., '制作中', '待取餐'
+  int stage; // 1: Placed, 2: Preparing, 3: Ready
 
   Order({
     required this.id,
     required this.items,
     required this.total,
     required this.orderDate,
-    this.status = '制作中',
+    this.stage = 1,
   });
 }
 
@@ -23,14 +23,17 @@ class OrderStatusModel extends ChangeNotifier {
   List<Order> get orders => _orders;
 
   List<Order> get inProgressOrders =>
-      _orders.where((o) => o.status == '制作中').toList();
+      _orders.where((o) => o.stage == 1 || o.stage == 2).toList();
 
   List<Order> get readyForPickupOrders =>
-      _orders.where((o) => o.status == '待取餐').toList();
+      _orders.where((o) => o.stage == 3).toList();
+
+  // Get the most recent order to display
+  Order? get latestOrder => _orders.isNotEmpty ? _orders.last : null;
 
   void placeOrder(List<CartItem> items, double total) {
     final newOrder = Order(
-      id: 'Order #${_orders.length + 1}',
+      id: 'Order #${_orders.length + 101}', // Start from #101
       items: List.from(items),
       total: total,
       orderDate: DateTime.now(),
@@ -39,10 +42,11 @@ class OrderStatusModel extends ChangeNotifier {
     notifyListeners();
   }
 
-  // In a real app, you'd have a system to update this status.
-  // For now, let's just add a dummy method to simulate it.
-  void moveOrderToPickup(Order order) {
-    order.status = '待取餐';
-    notifyListeners();
+  // Simulates the order progressing to the next stage
+  void advanceOrderStatus(Order order) {
+    if (order.stage < 3) {
+      order.stage++;
+      notifyListeners();
+    }
   }
 }

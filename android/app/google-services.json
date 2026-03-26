@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "225667979023",
+    "project_id": "tea-go-app",
+    "storage_bucket": "tea-go-app.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:225667979023:android:c9b36c658e66479dc8907a",
+        "android_client_info": {
+          "package_name": "com.example.tea_go_app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyD37mIOFr6SbcePUv0RIsXKw97rJIyrUXg"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -1,16 +1,23 @@
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:tea_go_app/auth_service.dart';
 import 'package:tea_go_app/cart_model.dart';
 import 'package:tea_go_app/home_page.dart';
 import 'package:tea_go_app/location_model.dart';
+import 'package:tea_go_app/menu_page.dart';
 import 'package:tea_go_app/order_status_model.dart';
-import 'package:tea_go_app/signup_page.dart';
+import 'package:tea_go_app/otp_verification_page.dart';
 import 'package:tea_go_app/user_model.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp();
   runApp(
     MultiProvider(
       providers: [
+        Provider<AuthService>(create: (_) => AuthService()),
         ChangeNotifierProvider(create: (context) => CartModel()),
         ChangeNotifierProvider(create: (context) => OrderStatusModel()),
         ChangeNotifierProvider(create: (context) => AuthModel()),
@@ -37,8 +44,71 @@ class MyApp extends StatelessWidget {
   }
 }
 
-class LoginPage extends StatelessWidget {
+class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
+
+  @override
+  State<LoginPage> createState() => _LoginPageState();
+}
+
+class _LoginPageState extends State<LoginPage> {
+  final _phoneController = TextEditingController();
+  bool _isLoading = false;
+
+  @override
+  void dispose() {
+    _phoneController.dispose();
+    super.dispose();
+  }
+
+  void _getTac() {
+    if (_phoneController.text.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please enter your phone number')),
+      );
+      return;
+    }
+
+    setState(() {
+      _isLoading = true;
+    });
+
+    final authService = Provider.of<AuthService>(context, listen: false);
+    authService.verifyPhoneNumber(
+      phoneNumber: '+60' + _phoneController.text,
+      context: context,
+      verificationCompleted: (PhoneAuthCredential credential) async {
+        await authService.signInWithCredential(credential);
+        setState(() {
+          _isLoading = false;
+        });
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (context) => const HomePage()),
+          (Route<dynamic> route) => false,
+        );
+      },
+      verificationFailed: (FirebaseAuthException e) {
+        setState(() {
+          _isLoading = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(e.message ?? 'Verification failed')),
+        );
+      },
+      codeSent: (String verificationId, int? resendToken) {
+        setState(() {
+          _isLoading = false;
+        });
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (context) =>
+                OtpVerificationPage(verificationId: verificationId),
+          ),
+        );
+      },
+      codeAutoRetrievalTimeout: (String verificationId) {},
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -66,6 +136,7 @@ class LoginPage extends StatelessWidget {
                 ),
                 const SizedBox(height: 48.0),
                 TextFormField(
+                  controller: _phoneController,
                   keyboardType: TextInputType.phone,
                   decoration: const InputDecoration(
                     prefixText: '+60 ',
@@ -83,31 +154,35 @@ class LoginPage extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 24.0),
-                ElevatedButton(
-                  onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (context) => const SignupPage()),
-                    );
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.green,
-                    padding: const EdgeInsets.symmetric(vertical: 16.0),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8.0),
+                SizedBox(
+                  width: double.infinity,
+                  height: 50,
+                  child: ElevatedButton(
+                    onPressed: _isLoading ? null : _getTac,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.green,
+                      padding: const EdgeInsets.symmetric(vertical: 16.0),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8.0),
+                      ),
                     ),
-                  ),
-                  child: const Text(
-                    '获取验证码 (Get TAC)',
-                    style: TextStyle(fontSize: 18, color: Colors.white),
+                    child: _isLoading
+                        ? const CircularProgressIndicator(
+                            valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                          )
+                        : const Text(
+                            '获取验证码 (Get TAC)',
+                            style: TextStyle(fontSize: 18, color: Colors.white),
+                          ),
                   ),
                 ),
                 const Spacer(),
                 TextButton(
                   onPressed: () {
-                    Navigator.push(
+                    Navigator.pushAndRemoveUntil(
                       context,
                       MaterialPageRoute(builder: (context) => const HomePage()),
+                      (Route<dynamic> route) => false,
                     );
                   },
                   child: const Text(

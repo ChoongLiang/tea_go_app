@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import 'package:tea_go_app/date_text_formatter.dart';
 import 'package:tea_go_app/home_page.dart';
 import 'package:tea_go_app/user_model.dart';
 
@@ -76,11 +78,24 @@ class _SignupPageState extends State<SignupPage> {
               TextFormField(
                 controller: _dobController,
                 decoration: const InputDecoration(labelText: 'Date of Birth (DD/MM/YYYY)'),
-                validator: (value) => value!.isEmpty ? 'Please enter your date of birth' : null,
+                keyboardType: TextInputType.number,
+                inputFormatters: [
+                  LengthLimitingTextInputFormatter(10),
+                  DateTextFormatter(),
+                ],
+                validator: (value) {
+                  if (value == null || value.isEmpty) {
+                    return 'Please enter your date of birth';
+                  }
+                  if (value.length != 10) {
+                    return 'Date of birth must be in DD/MM/YYYY format';
+                  }
+                  return null;
+                },
               ),
               const SizedBox(height: 12),
               DropdownButtonFormField<String>(
-                value: _gender,
+                initialValue: _gender,
                 hint: const Text('Gender'),
                 onChanged: (value) => setState(() => _gender = value),
                 items: ['Male', 'Female', 'Other'].map<DropdownMenuItem<String>>((String value) {
@@ -96,7 +111,19 @@ class _SignupPageState extends State<SignupPage> {
                 controller: _emailController,
                 decoration: const InputDecoration(labelText: 'Email'),
                 keyboardType: TextInputType.emailAddress,
-                validator: (value) => value!.isEmpty || !value.contains('@') ? 'Please enter a valid email' : null,
+                validator: (value) {
+                  if (value == null || value.isEmpty) {
+                    return 'Please enter your email';
+                  }
+                  // A more robust email validation regex
+                  String pattern =
+                      r"^[a-zA-Z0-9.a-zA-Z0-9.!#$%&'*+-/=?^_`{|}~]+@[a-zA-Z0-9]+\.[a-zA-Z]+";
+                  RegExp regex = RegExp(pattern);
+                  if (!regex.hasMatch(value)) {
+                    return 'Please enter a valid email';
+                  }
+                  return null;
+                },
               ),
               const SizedBox(height: 30),
               ElevatedButton(

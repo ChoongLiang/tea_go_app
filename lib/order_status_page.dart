@@ -76,7 +76,7 @@ class OrderStatusPage extends StatelessWidget {
               ],
             ),
             const Divider(height: 20, thickness: 1),
-            ...orders.map((order) => _buildOrderItem(order)).toList(),
+            ...orders.map((order) => _buildOrderItem(order)),
           ],
         ),
       ),
