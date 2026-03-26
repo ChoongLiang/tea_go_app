@@ -1,104 +1,360 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:tea_go_app/auth_service.dart';
+import 'package:tea_go_app/drink_image_widget.dart';
+import 'package:tea_go_app/main.dart';
 import 'package:tea_go_app/order_status_model.dart';
+import 'package:tea_go_app/user_model.dart';
 
-// 定义与登录页一致的抹茶绿主题色
 const Color matchaGreen = Color(0xFFE8F5E9);
-const Color darkMatchaGreen = Color(0xFF66BB6A); // 用于按钮和重点文字的深抹茶绿
+const Color darkMatchaGreen = Color(0xFF66BB6A);
 
-class OrderStatusPage extends StatelessWidget {
+class OrderStatusPage extends StatefulWidget {
   const OrderStatusPage({super.key});
+
+  @override
+  State<OrderStatusPage> createState() => _OrderStatusPageState();
+}
+
+class _OrderStatusPageState extends State<OrderStatusPage> {
+  List<Map<String, dynamic>> _firestoreOrders = [];
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchOrders();
+  }
+
+  Future<void> _fetchOrders() async {
+    final orders = await AuthService().loadOrders();
+    if (mounted) setState(() { _firestoreOrders = orders; _loading = false; });
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: const Color(0xFFF5F5F5),
       appBar: AppBar(
-        title: const Text('订单状态'),
+        title: const Text('Activities', style: TextStyle(fontWeight: FontWeight.bold)),
         backgroundColor: Colors.white,
-        elevation: 1,
+        elevation: 0,
         automaticallyImplyLeading: false,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh, color: Colors.black54),
+            onPressed: () { setState(() => _loading = true); _fetchOrders(); },
+          ),
+        ],
       ),
-      backgroundColor: matchaGreen,
-      body: Consumer<OrderStatusModel>(
-        builder: (context, orderStatus, child) {
-          if (orderStatus.orders.isEmpty) {
-            return const Center(
-              child: Text(
-                '您还没有任何订单',
-                style: TextStyle(fontSize: 18, color: Colors.grey),
-              ),
-            );
+      body: Consumer<AuthModel>(
+        builder: (context, auth, _) {
+          if (auth.isGuest || !auth.isLoggedIn) {
+            return _buildLoginWall(context);
           }
-          return ListView(
-            padding: const EdgeInsets.all(16.0),
-            children: [
-              if (orderStatus.inProgressOrders.isNotEmpty)
-                _buildStatusSection(
-                  title: '制作中',
-                  icon: Icons.local_fire_department,
-                  orders: orderStatus.inProgressOrders,
-                ),
-              const SizedBox(height: 20),
-              if (orderStatus.readyForPickupOrders.isNotEmpty)
-                _buildStatusSection(
-                  title: '待取餐',
-                  icon: Icons.check_circle,
-                  orders: orderStatus.readyForPickupOrders,
-                ),
-            ],
-          );
+          return _loading
+              ? const Center(child: CircularProgressIndicator(color: darkMatchaGreen))
+              : Consumer<OrderStatusModel>(
+              builder: (context, orderStatus, _) {
+                // Merge: local orders take priority (have stage info), Firestore fills in the rest
+                final localIds = orderStatus.orders.map((o) => o.id).toSet();
+                final firestoreOnly = _firestoreOrders
+                    .where((o) => !localIds.contains(o['orderId']))
+                    .toList();
+
+                if (orderStatus.orders.isEmpty && firestoreOnly.isEmpty) {
+                  return const Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.receipt_long_outlined, size: 72, color: Colors.grey),
+                        SizedBox(height: 16),
+                        Text('No orders yet', style: TextStyle(fontSize: 18, color: Colors.grey)),
+                        SizedBox(height: 8),
+                        Text('Your order history will appear here', style: TextStyle(fontSize: 14, color: Colors.grey)),
+                      ],
+                    ),
+                  );
+                }
+
+                return ListView(
+                  padding: const EdgeInsets.all(16),
+                  children: [
+                    if (orderStatus.orders.isNotEmpty) ...[
+                      _sectionLabel('Active Orders'),
+                      const SizedBox(height: 10),
+                      ...orderStatus.orders.map((o) => _buildLocalOrderCard(context, o, orderStatus)),
+                      const SizedBox(height: 20),
+                    ],
+                    if (firestoreOnly.isNotEmpty) ...[
+                      _sectionLabel('Past Orders'),
+                      const SizedBox(height: 10),
+                      ...firestoreOnly.map((o) => _buildFirestoreOrderCard(o)),
+                    ],
+                  ],
+                );
+              },
+            );
         },
       ),
     );
   }
 
-  Widget _buildStatusSection({
-    required String title,
-    required IconData icon,
-    required List<Order> orders,
-  }) {
-    return Card(
-      elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+  Widget _buildLoginWall(BuildContext context) {
+    return Center(
       child: Padding(
-        padding: const EdgeInsets.all(16.0),
+        padding: const EdgeInsets.all(32),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Row(
-              children: [
-                Icon(icon, color: darkMatchaGreen),
-                const SizedBox(width: 8),
-                Text(
-                  title,
-                  style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+            const Icon(Icons.lock_outline, size: 72, color: Colors.grey),
+            const SizedBox(height: 16),
+            const Text('Sign in to view your orders',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 8),
+            const Text('Your order history and active orders will appear here.',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: Colors.grey)),
+            const SizedBox(height: 24),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: () {
+                  Navigator.of(context).pushAndRemoveUntil(
+                    MaterialPageRoute(builder: (_) => const LoginPage()),
+                    (route) => false,
+                  );
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: darkMatchaGreen,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
                 ),
-              ],
+                child: const Text('Sign In', style: TextStyle(color: Colors.white)),
+              ),
             ),
-            const Divider(height: 20, thickness: 1),
-            ...orders.map((order) => _buildOrderItem(order)),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildOrderItem(Order order) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8.0),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+  Widget _sectionLabel(String label) =>
+      Text(label, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.black54));
+
+  // Card for orders in the current session (has stage info)
+  Widget _buildLocalOrderCard(BuildContext context, Order order, OrderStatusModel model) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 8, offset: const Offset(0, 3))],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Expanded(
-            child: Text(
-              order.items.map((item) => '${item.name} x${item.quantity}').join(', '),
-              style: const TextStyle(fontSize: 16),
-              overflow: TextOverflow.ellipsis,
-            ),
+          _cardHeader(order.id, _buildStatusBadge(order.stage)),
+          const Divider(height: 1),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            child: _buildStepper(order.stage),
           ),
-          Text(order.id, style: const TextStyle(fontSize: 16, color: Colors.grey)),
+          const Divider(height: 1),
+          _buildItemsList(order.items.map((i) => {
+            'name': i.name,
+            'quantity': i.quantity,
+            'price': i.price,
+            'imageUrl': i.imageUrl,
+          }).toList()),
+          const Divider(height: 1),
+          _cardFooter(order.outlet, order.orderDate.toString(), order.total),
+          if (order.stage <= 3)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
+              child: GestureDetector(
+                onTap: () => model.advanceOrderStatus(order),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  decoration: BoxDecoration(color: matchaGreen, borderRadius: BorderRadius.circular(8)),
+                  child: const Center(
+                    child: Text('Advance Status (Demo)',
+                        style: TextStyle(fontSize: 12, color: darkMatchaGreen, fontWeight: FontWeight.w600)),
+                  ),
+                ),
+              ),
+            ),
         ],
       ),
     );
+  }
+
+  // Card for past orders loaded from Firestore
+  Widget _buildFirestoreOrderCard(Map<String, dynamic> order) {
+    final items = (order['items'] as List<dynamic>? ?? [])
+        .map((i) => Map<String, dynamic>.from(i as Map))
+        .toList();
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 8, offset: const Offset(0, 3))],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _cardHeader(order['orderId'] ?? '—', _buildStatusBadge(4)),
+          const Divider(height: 1),
+          _buildItemsList(items),
+          const Divider(height: 1),
+          _cardFooter(
+            order['outlet'] ?? '',
+            order['createdAt']?.toDate().toString() ?? '',
+            (order['total'] as num?)?.toDouble() ?? 0,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _cardHeader(String id, Widget badge) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(id, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+          badge,
+        ],
+      ),
+    );
+  }
+
+  Widget _buildItemsList(List<Map<String, dynamic>> items) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Items', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.grey.shade500)),
+          const SizedBox(height: 8),
+          ...items.map((item) => Padding(
+            padding: const EdgeInsets.only(bottom: 6),
+            child: Row(
+              children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: DrinkImageWidget(
+                    imageUrl: item['imageUrl'] as String? ?? '',
+                    height: 34,
+                    width: 34,
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text('${item['name']}  ×${item['quantity']}',
+                      style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
+                ),
+                Text(
+                  'RM ${((item['price'] as num) * (item['quantity'] as num)).toStringAsFixed(2)}',
+                  style: const TextStyle(fontSize: 13, color: Colors.black54),
+                ),
+              ],
+            ),
+          )),
+        ],
+      ),
+    );
+  }
+
+  Widget _cardFooter(String outlet, String dateStr, double total) {
+    String time = '';
+    try {
+      final dt = DateTime.parse(dateStr);
+      final h = dt.hour % 12 == 0 ? 12 : dt.hour % 12;
+      final m = dt.minute.toString().padLeft(2, '0');
+      time = '$h:$m ${dt.hour >= 12 ? 'PM' : 'AM'}';
+    } catch (_) {}
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 10, 16, 14),
+      child: Row(
+        children: [
+          const Icon(Icons.store_outlined, size: 14, color: Colors.grey),
+          const SizedBox(width: 4),
+          Expanded(
+            child: Text(outlet.isEmpty ? 'Unknown outlet' : outlet,
+                style: const TextStyle(fontSize: 12, color: Colors.grey)),
+          ),
+          if (time.isNotEmpty) ...[
+            const Icon(Icons.access_time, size: 14, color: Colors.grey),
+            const SizedBox(width: 4),
+            Text(time, style: const TextStyle(fontSize: 12, color: Colors.grey)),
+            const SizedBox(width: 12),
+          ],
+          Text('RM ${total.toStringAsFixed(2)}',
+              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: darkMatchaGreen)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStatusBadge(int stage) {
+    final config = _stageConfig(stage);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(color: config['color'] as Color, borderRadius: BorderRadius.circular(20)),
+      child: Text(config['label'] as String,
+          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: config['textColor'] as Color)),
+    );
+  }
+
+  Widget _buildStepper(int stage) {
+    final steps = ['Order Placed', 'Preparing', 'Ready'];
+    return Row(
+      children: List.generate(steps.length, (i) {
+        final stepNum = i + 1;
+        final done = stage >= stepNum;
+        return Expanded(
+          child: Row(
+            children: [
+              Column(
+                children: [
+                  Container(
+                    width: 28, height: 28,
+                    decoration: BoxDecoration(shape: BoxShape.circle, color: done ? darkMatchaGreen : Colors.grey.shade200),
+                    child: Icon(done ? Icons.check : Icons.circle,
+                        size: done ? 16 : 8, color: done ? Colors.white : Colors.grey.shade400),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(steps[i],
+                      style: TextStyle(fontSize: 10,
+                          fontWeight: stage == stepNum ? FontWeight.bold : FontWeight.normal,
+                          color: done ? darkMatchaGreen : Colors.grey)),
+                ],
+              ),
+              if (i < steps.length - 1)
+                Expanded(
+                  child: Container(
+                    height: 2,
+                    margin: const EdgeInsets.only(bottom: 18),
+                    color: stage > stepNum ? darkMatchaGreen : Colors.grey.shade200,
+                  ),
+                ),
+            ],
+          ),
+        );
+      }),
+    );
+  }
+
+  Map<String, dynamic> _stageConfig(int stage) {
+    switch (stage) {
+      case 1: return {'label': 'Order Placed', 'color': Colors.blue.shade50, 'textColor': Colors.blue.shade700};
+      case 2: return {'label': 'Preparing', 'color': Colors.orange.shade50, 'textColor': Colors.orange.shade700};
+      case 3: return {'label': 'Ready for Pickup', 'color': matchaGreen, 'textColor': darkMatchaGreen};
+      default: return {'label': 'Completed', 'color': Colors.grey.shade100, 'textColor': Colors.grey};
+    }
   }
 }

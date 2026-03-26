@@ -6,13 +6,17 @@ class CartItem {
   String sugarLevel;
   String iceLevel;
   int quantity;
+  String note;
+  final String imageUrl;
 
   CartItem({
     required this.name,
     required this.price,
-    this.sugarLevel = '正常',
-    this.iceLevel = '正常冰',
+    this.sugarLevel = 'Normal',
+    this.iceLevel = 'Normal Ice',
     this.quantity = 1,
+    this.note = '',
+    this.imageUrl = '',
   });
 
   // A unique ID for each item based on its properties

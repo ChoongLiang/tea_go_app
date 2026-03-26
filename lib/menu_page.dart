@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:tea_go_app/cart_model.dart';
+import 'package:tea_go_app/drink_image_widget.dart';
 import 'package:tea_go_app/item_details_page.dart';
 import 'package:tea_go_app/location_model.dart';
 import 'package:tea_go_app/shopping_cart_page.dart';
@@ -12,22 +13,55 @@ const Color darkMatchaGreen = Color(0xFF66BB6A); // 用于按钮和重点文字�
 class MenuPage extends StatelessWidget {
   const MenuPage({super.key});
 
-  // 推荐饮品假数据
-  final List<Map<String, dynamic>> _recommendedDrinks = const [
-    {'name': '招牌珍珠奶茶', 'price': 12.90},
-    {'name': '抹茶拿铁', 'price': 15.90},
-    {'name': '芝士葡萄', 'price': 18.90},
-  ];
+  List<String> get _categories =>
+      _menuItems.map((e) => e['category'] as String).toSet().toList();
 
-  // 菜单列表假数据
+  List<Map<String, dynamic>> _itemsForCategory(String category) =>
+      _menuItems.where((e) => e['category'] == category).toList();
+
   final List<Map<String, dynamic>> _menuItems = const [
-    {'name': '珍珠奶茶', 'price': 10.90},
-    {'name': '抹茶拿铁', 'price': 15.90},
-    {'name': '百香果绿茶', 'price': 9.90},
-    {'name': '芝士芒芒', 'price': 17.90},
-    {'name': '芋泥波波', 'price': 13.90},
-    {'name': '草莓欧蕾', 'price': 16.90},
-    {'name': '柠檬红茶', 'price': 8.90},
+    {
+      'name': 'Signature Teh Tarik Milk Tea', 'category': 'Milk Tea', 'price': 6.50,
+      'imageUrl': 'https://firebasestorage.googleapis.com/v0/b/tea-go-app.firebasestorage.app/o/teh%20tarik.webp?alt=media&token=99d711a6-3e58-4aca-b661-f136e8b39eac',
+      'bestSeller': true, 'featured': true, 'calorieLevel': 'High',
+      'sugarLevels': ['0%', '25%', '50%', '75%', '100%'], 'iceLevels': ['No Ice', 'Less Ice', 'Normal Ice'],
+    },
+    {
+      'name': 'Sea Salt Cream Tea', 'category': 'Milk Tea', 'price': 7.50,
+      'imageUrl': 'https://firebasestorage.googleapis.com/v0/b/tea-go-app.firebasestorage.app/o/sea%20salt.webp?alt=media&token=83609ada-c0c5-4078-a132-bb084a857406',
+      'bestSeller': false, 'featured': false, 'calorieLevel': 'High',
+      'sugarLevels': ['25%', '50%', '75%', '100%'], 'iceLevels': ['Less Ice', 'Normal Ice'],
+    },
+    {
+      'name': 'Gula Melaka Milk Tea', 'category': 'Milk Tea', 'price': 7.00,
+      'imageUrl': 'https://firebasestorage.googleapis.com/v0/b/tea-go-app.firebasestorage.app/o/gula%20melaka.webp?alt=media&token=a3280cd5-9180-4d45-b04b-48a5f4734ff5',
+      'bestSeller': true, 'featured': false, 'calorieLevel': 'High',
+      'sugarLevels': ['25%', '50%', '75%', '100%'], 'iceLevels': ['No Ice', 'Less Ice', 'Normal Ice'],
+    },
+    {
+      'name': 'Lemon Tea', 'category': 'Fruit Tea', 'price': 5.50,
+      'imageUrl': 'https://firebasestorage.googleapis.com/v0/b/tea-go-app.firebasestorage.app/o/lemon%20tea.webp?alt=media&token=0bdb2d4e-4cd7-4a49-b441-e0fbcbbdaace',
+      'bestSeller': true, 'featured': false, 'calorieLevel': 'Low',
+      'sugarLevels': ['0%', '25%', '50%', '75%', '100%'], 'iceLevels': ['No Ice', 'Less Ice', 'Normal Ice', 'Extra Ice'],
+    },
+    {
+      'name': 'Honey Lemon', 'category': 'Fruit Tea', 'price': 6.50,
+      'imageUrl': 'https://firebasestorage.googleapis.com/v0/b/tea-go-app.firebasestorage.app/o/honey%20lemon.webp?alt=media&token=06cb863b-fd58-4323-a4ec-e5ec31ce166f',
+      'bestSeller': true, 'featured': true, 'calorieLevel': 'Medium',
+      'sugarLevels': ['0%', '25%', '50%', '75%'], 'iceLevels': ['No Ice', 'Less Ice', 'Normal Ice', 'Extra Ice'],
+    },
+    {
+      'name': 'Lime Sour Plum', 'category': 'Fruit Tea', 'price': 6.00,
+      'imageUrl': 'https://firebasestorage.googleapis.com/v0/b/tea-go-app.firebasestorage.app/o/lime%20sour.webp?alt=media&token=ca95baa2-affb-4de0-bef7-ad035c71b0b6',
+      'bestSeller': false, 'featured': false, 'calorieLevel': 'Low',
+      'sugarLevels': ['0%', '25%', '50%'], 'iceLevels': ['Less Ice', 'Normal Ice', 'Extra Ice'],
+    },
+    {
+      'name': 'Cold Brew Jasmine Green Tea', 'category': 'Fresh Tea', 'price': 6.50,
+      'imageUrl': 'https://firebasestorage.googleapis.com/v0/b/tea-go-app.firebasestorage.app/o/jasmine.webp?alt=media&token=ab36e45a-153e-4ba1-a7ed-5010c54d4dde',
+      'bestSeller': false, 'featured': false, 'calorieLevel': 'Low',
+      'sugarLevels': ['0%', '25%', '50%', '75%', '100%'], 'iceLevels': ['No Ice', 'Less Ice', 'Normal Ice', 'Extra Ice'],
+    },
   ];
 
   @override
@@ -38,33 +72,19 @@ class MenuPage extends StatelessWidget {
         automaticallyImplyLeading: false, // 不显示返回按钮
         backgroundColor: Colors.white,
         elevation: 0,
-        title: Column(
-          children: [
-            _buildLocationPicker(context),
-            _buildSearchBox(context),
-          ],
-        ),
-        toolbarHeight: 120, // Increased height
+        title: _buildLocationPicker(context),
       ),
       body: CustomScrollView(
         slivers: [
-          const SliverToBoxAdapter(child: SizedBox(height: 10)),
-          SliverToBoxAdapter(
-            child: _buildRecommendedSection(context),
-          ),
-          const SliverToBoxAdapter(
-            child: Padding(
-              padding: EdgeInsets.symmetric(horizontal: 20.0, vertical: 20.0),
-              child: Divider(height: 1),
-            ),
-          ),
-          SliverToBoxAdapter(
-            child: _buildMenuListHeader(),
-          ),
-          _buildMenuList(context),
+          SliverToBoxAdapter(child: _buildBanner()),
+          ..._categories.expand((category) => [
+            SliverToBoxAdapter(child: _buildCategoryHeader(category)),
+            _buildCategoryGrid(context, category),
+          ]),
+          const SliverToBoxAdapter(child: SizedBox(height: 24)),
         ],
       ),
-      bottomNavigationBar: _buildBottomBar(context),
+      floatingActionButton: _buildCartFab(context),
     );
   }
 
@@ -119,106 +139,50 @@ class MenuPage extends StatelessWidget {
     );
   }
 
-  // 搜索框
-  Widget _buildSearchBox(BuildContext context) {
+  // Big promotional banner
+  Widget _buildBanner() {
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 4.0),
+      margin: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+      height: 160,
       decoration: BoxDecoration(
-        color: matchaGreen,
-        borderRadius: BorderRadius.circular(30),
+        borderRadius: BorderRadius.circular(20),
+        gradient: const LinearGradient(
+          colors: [Color(0xFF43A047), Color(0xFFA5D6A7)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
       ),
-      child: Row(
+      child: Stack(
         children: [
-          const Expanded(
-            child: TextField(
-              decoration: InputDecoration(
-                hintText: '想喝什么？',
-                hintStyle: TextStyle(color: darkMatchaGreen),
-                border: InputBorder.none,
-                prefixIcon: Icon(Icons.search, color: darkMatchaGreen),
-              ),
+          Positioned(
+            right: -20,
+            bottom: -20,
+            child: Icon(
+              Icons.emoji_food_beverage,
+              size: 160,
+              color: Colors.white.withValues(alpha: 0.12),
             ),
           ),
-          IconButton(
-            icon: const Icon(Icons.shopping_cart, color: darkMatchaGreen),
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => const ShoppingCartPage()),
-              );
-            },
-          ),
-        ],
-      ),
-    );
-  }
-
-  // 横向滚动的推荐位
-  Widget _buildRecommendedSection(BuildContext context) {
-    return SizedBox(
-      height: 230,
-      child: ListView.builder(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.only(left: 20),
-        itemCount: _recommendedDrinks.length,
-        itemBuilder: (context, index) {
-          return _buildRecommendedCard(context, _recommendedDrinks[index]);
-        },
-      ),
-    );
-  }
-
-  // 推荐位茶饮卡片
-  Widget _buildRecommendedCard(BuildContext context, Map<String, dynamic> drink) {
-    return Container(
-      width: 160,
-      margin: const EdgeInsets.only(right: 16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(15),
-        border: Border.all(color: Colors.grey.shade200),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // 图片占位符
-          Container(
-            height: 130,
-            decoration: const BoxDecoration(
-              borderRadius: BorderRadius.only(
-                topLeft: Radius.circular(15),
-                topRight: Radius.circular(15),
-              ),
-              color: matchaGreen,
-            ),
-            child: Center(
-              child: Icon(
-                Icons.emoji_food_beverage_outlined,
-                color: darkMatchaGreen.withOpacity(0.7),
-                size: 50,
-              ),
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.all(10.0),
+          const Padding(
+            padding: EdgeInsets.all(24),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Text(
-                  drink['name']!,
-                  style: const TextStyle(
+                  'Fresh & Handcrafted',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 22,
                     fontWeight: FontWeight.bold,
-                    fontSize: 16,
                   ),
-                  overflow: TextOverflow.ellipsis,
                 ),
-                const SizedBox(height: 8),
+                SizedBox(height: 6),
                 Text(
-                  'RM ${drink['price']!.toStringAsFixed(2)}',
-                  style: const TextStyle(
-                    color: darkMatchaGreen,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 15,
+                  'Order your favourite tea today ☕',
+                  style: TextStyle(
+                    color: Colors.white70,
+                    fontSize: 14,
                   ),
                 ),
               ],
@@ -229,132 +193,183 @@ class MenuPage extends StatelessWidget {
     );
   }
 
-  // 菜单列表标题
-  Widget _buildMenuListHeader() {
-    return const Padding(
-      padding: EdgeInsets.symmetric(horizontal: 20.0),
-      child: Text(
-        '所有饮品',
-        style: TextStyle(
-          fontSize: 22,
-          fontWeight: FontWeight.bold,
-          color: Colors.black87,
-        ),
-      ),
-    );
-  }
-
-  // 纵向茶饮列表
-  Widget _buildMenuList(BuildContext context) {
-    return SliverList(
-      delegate: SliverChildBuilderDelegate(
-        (context, index) {
-          return _buildMenuItem(context, _menuItems[index]);
-        },
-        childCount: _menuItems.length,
-      ),
-    );
-  }
-
-  // 单个茶饮列表项
-  Widget _buildMenuItem(BuildContext context, Map<String, dynamic> item) {
+  Widget _buildCategoryHeader(String category) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 12.0),
+      padding: const EdgeInsets.fromLTRB(16, 20, 16, 10),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(item['name'], style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w500)),
-          InkWell(
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => ItemDetailsPage(item: item),
-                ),
-              );
-            },
-            borderRadius: BorderRadius.circular(20),
-            child: Container(
-                decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.blue.withOpacity(0.2),
-                        spreadRadius: 2,
-                        blurRadius: 5,
-                      )
-                    ]),
-                child: const Icon(Icons.add_circle, color: Colors.blue, size: 32)),
+          Container(
+            width: 4, height: 18,
+            decoration: BoxDecoration(
+              color: darkMatchaGreen,
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Text(
+            category,
+            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.black87),
           ),
         ],
       ),
     );
   }
 
-  // 底部固定的浮动条
-  Widget _buildBottomBar(BuildContext context) {
+  SliverPadding _buildCategoryGrid(BuildContext context, String category) {
+    final items = _itemsForCategory(category);
+    return SliverPadding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      sliver: SliverGrid(
+        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: 2,
+          crossAxisSpacing: 14,
+          mainAxisSpacing: 14,
+          mainAxisExtent: 192,
+        ),
+        delegate: SliverChildBuilderDelegate(
+          (context, index) => _buildMenuItem(context, items[index]),
+          childCount: items.length,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMenuItem(BuildContext context, Map<String, dynamic> item) {
+    return GestureDetector(
+      onTap: () => Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => ItemDetailsPage(item: item)),
+      ),
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(14),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.07),
+              blurRadius: 8,
+              offset: const Offset(0, 3),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Image with + button overlay
+            ClipRRect(
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(14)),
+              child: Stack(
+                children: [
+                  DrinkImageWidget(
+                    imageUrl: item['imageUrl'] as String? ?? '',
+                    height: 110,
+                    width: double.infinity,
+                  ),
+                  if (item['bestSeller'] == true)
+                    Positioned(
+                      top: 8, left: 8,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: Colors.orange.shade400,
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: const Text('Best Seller',
+                            style: TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold)),
+                      ),
+                    ),
+                  Positioned(
+                    top: 8, right: 8,
+                    child: Container(
+                      width: 28, height: 28,
+                      decoration: BoxDecoration(
+                        color: darkMatchaGreen,
+                        shape: BoxShape.circle,
+                        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.15), blurRadius: 4, offset: const Offset(0, 2))],
+                      ),
+                      child: const Icon(Icons.add, color: Colors.white, size: 16),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            // Info — name + price only, no button
+            Padding(
+              padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    item['name'],
+                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.black87),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    'RM ${(item['price'] as double).toStringAsFixed(2)}',
+                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: darkMatchaGreen),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCartFab(BuildContext context) {
     return Consumer<CartModel>(
       builder: (context, cart, child) {
-        return Container(
-          height: 80,
-          decoration: BoxDecoration(
-            color: Colors.white,
-            boxShadow: [
-              BoxShadow(
-                color: Colors.grey.withOpacity(0.2),
-                spreadRadius: 2,
-                blurRadius: 10,
-                offset: const Offset(0, -3),
-              ),
-            ],
+        if (cart.items.isEmpty) return const SizedBox.shrink();
+        return GestureDetector(
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const ShoppingCartPage()),
           ),
-          padding: const EdgeInsets.symmetric(horizontal: 25, vertical: 10),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              RichText(
-                text: TextSpan(
-                    style: const TextStyle(fontSize: 18, color: Colors.black87),
-                    children: [
-                      const TextSpan(text: '已选 '),
-                      TextSpan(
-                        text: '${cart.totalCups}',
-                        style: const TextStyle(
-                            fontWeight: FontWeight.bold, fontSize: 20),
-                      ),
-                      const TextSpan(text: ' 杯'),
-                    ]),
-              ),
-              ElevatedButton(
-                onPressed: cart.items.isNotEmpty
-                    ? () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                              builder: (context) => const ShoppingCartPage()),
-                        );
-                      }
-                    : null, // 当未选商品时禁用按钮
-                style: ElevatedButton.styleFrom(
-                    backgroundColor: darkMatchaGreen,
-                    disabledBackgroundColor: Colors.grey.shade300,
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 40, vertical: 15),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(30),
-                    ),
-                    elevation: 5,
-                    shadowColor: darkMatchaGreen.withOpacity(0.5)),
-                child: const Text(
-                  '去结算',
-                  style: TextStyle(
-                    fontSize: 18,
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
-                  ),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+            decoration: BoxDecoration(
+              color: darkMatchaGreen,
+              borderRadius: BorderRadius.circular(30),
+              boxShadow: [
+                BoxShadow(
+                  color: darkMatchaGreen.withValues(alpha: 0.4),
+                  blurRadius: 12,
+                  offset: const Offset(0, 4),
                 ),
-              ),
-            ],
+              ],
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    const Icon(Icons.shopping_cart, color: Colors.white, size: 22),
+                    Positioned(
+                      top: -6, right: -8,
+                      child: Container(
+                        width: 18, height: 18,
+                        decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
+                        child: Center(
+                          child: Text(
+                            '${cart.totalCups}',
+                            style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: darkMatchaGreen),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(width: 10),
+                Text(
+                  'RM ${cart.totalPrice.toStringAsFixed(2)}',
+                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15),
+                ),
+              ],
+            ),
           ),
         );
       },
