@@ -528,7 +528,7 @@ class _ShoppingCartPageState extends State<ShoppingCartPage> {
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
           ),
           onPressed: () {
-            Navigator.push(context, MaterialPageRoute(builder: (_) => PaymentSuccessPage(totalAmount: payable)));
+            Navigator.push(context, MaterialPageRoute(builder: (_) => PaymentSuccessPage(totalAmount: payable, pickupTime: _selectedPickupTime, paymentMethod: _selectedPayment)));
           },
           child: Text(
             'Proceed to Pay  ·  RM ${payable.toStringAsFixed(2)}',

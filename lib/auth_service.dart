@@ -60,20 +60,45 @@ class AuthService {
     print("✅ [Firestore] User profile saved for UID: $uid");
   }
 
+  // Update existing user profile fields in Firestore
+  Future<void> updateUserProfile(model.User user) async {
+    final uid = _auth.currentUser?.uid;
+    if (uid == null) return;
+    await _db.collection('users').doc(uid).update({
+      'firstName': user.firstName,
+      'lastName': user.lastName,
+      'dob': user.dob,
+      'gender': user.gender,
+      'email': user.email,
+    });
+  }
+
+  // Atomically increment a global order counter and return zero-padded 3-digit queue number
+  Future<String> getNextQueueNumber() async {
+    final ref = _db.collection('counters').doc('orders');
+    final count = await _db.runTransaction<int>((t) async {
+      final snap = await t.get(ref);
+      final next = ((snap.exists ? snap.data()!['count'] as int? : null) ?? 0) + 1;
+      t.set(ref, {'count': next}, SetOptions(merge: true));
+      return next;
+    });
+    return count.toString().padLeft(3, '0');
+  }
+
   // Save completed order to Firestore under orders/{uid}/
   Future<void> saveOrder({
     required String orderId,
+    required String queueNumber,
+    required String paymentMethod,
     required List<CartItem> items,
     required double total,
     required String outlet,
   }) async {
-    final uid = _auth.currentUser?.uid;
-    final collection = uid != null
-        ? _db.collection('users').doc(uid).collection('orders')
-        : _db.collection('guest_orders');
-
-    await collection.doc(orderId).set({
+    final uid = _auth.currentUser!.uid;
+    await _db.collection('users').doc(uid).collection('orders').doc(orderId).set({
       'orderId': orderId,
+      'queueNumber': queueNumber,
+      'paymentMethod': paymentMethod,
       'outlet': outlet,
       'total': total,
       'status': 'placed',

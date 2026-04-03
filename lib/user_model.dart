@@ -20,10 +20,16 @@ class User {
 // Manages the app's authentication state
 class AuthModel extends ChangeNotifier {
   User? _currentUser;
+
   bool get isLoggedIn => _currentUser != null;
   User? get currentUser => _currentUser;
 
   void login(User user) {
+    _currentUser = user;
+    notifyListeners();
+  }
+
+  void updateProfile(User user) {
     _currentUser = user;
     notifyListeners();
   }

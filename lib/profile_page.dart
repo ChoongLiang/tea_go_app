@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:tea_go_app/edit_profile_page.dart';
 import 'package:tea_go_app/main.dart';
 import 'package:tea_go_app/order_status_model.dart';
 import 'package:tea_go_app/user_model.dart';
 
 const Color darkMatchaGreen = Color(0xFF66BB6A);
+const Color lightMatchaGreen = Color(0xFFE8F5E9);
 
 class ProfilePage extends StatelessWidget {
   const ProfilePage({super.key});
@@ -12,64 +14,20 @@ class ProfilePage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: const Color(0xFFF5F5F5),
       appBar: AppBar(
-        title: const Text('Profile'),
+        title: const Text('Profile', style: TextStyle(fontWeight: FontWeight.bold)),
+        backgroundColor: Colors.white,
+        elevation: 0,
         automaticallyImplyLeading: false,
       ),
       body: Consumer<AuthModel>(
         builder: (context, auth, child) {
-          if (auth.isGuest) {
-            return _buildGuestView(context);
-          }
           if (!auth.isLoggedIn) {
             return _buildLoggedOutView(context);
           }
           return _buildLoggedInView(context, auth.currentUser!);
         },
-      ),
-    );
-  }
-
-  Widget _buildGuestView(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24.0),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(Icons.person_outline, size: 72, color: Colors.grey),
-            const SizedBox(height: 16),
-            const Text(
-              'You\'re browsing as a guest',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 8),
-            const Text(
-              'Sign up to track your orders and save your preferences.',
-              textAlign: TextAlign.center,
-              style: TextStyle(color: Colors.grey),
-            ),
-            const SizedBox(height: 24),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: () {
-                  Provider.of<AuthModel>(context, listen: false).logout();
-                  Provider.of<OrderStatusModel>(context, listen: false).clearOrders();
-                  Navigator.of(context).pushAndRemoveUntil(
-                    MaterialPageRoute(builder: (context) => const LoginPage()),
-                    (route) => false,
-                  );
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: darkMatchaGreen,
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                ),
-                child: const Text('Sign In / Sign Up', style: TextStyle(color: Colors.white)),
-              ),
-            ),
-          ],
-        ),
       ),
     );
   }
@@ -96,58 +54,126 @@ class ProfilePage extends StatelessWidget {
   }
 
   Widget _buildLoggedInView(BuildContext context, User user) {
+    final initials =
+        '${user.firstName.isNotEmpty ? user.firstName[0] : ''}${user.lastName.isNotEmpty ? user.lastName[0] : ''}'
+            .toUpperCase();
+
     return ListView(
+      padding: const EdgeInsets.all(16),
       children: [
-        ListTile(
-          leading: const Icon(Icons.person),
-          title: Text('${user.firstName} ${user.lastName}'),
-          subtitle: Text(user.email),
+        // Profile header card
+        Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Column(
+            children: [
+              CircleAvatar(
+                radius: 40,
+                backgroundColor: lightMatchaGreen,
+                child: Text(initials,
+                    style: const TextStyle(
+                        fontSize: 28, fontWeight: FontWeight.bold, color: darkMatchaGreen)),
+              ),
+              const SizedBox(height: 12),
+              Text('${user.firstName} ${user.lastName}',
+                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 4),
+              Text(user.email, style: TextStyle(fontSize: 13, color: Colors.grey.shade500)),
+              const SizedBox(height: 16),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: () => Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => EditProfilePage(user: user)),
+                  ),
+                  icon: const Icon(Icons.edit_outlined, size: 18, color: darkMatchaGreen),
+                  label: const Text('Edit Profile',
+                      style: TextStyle(color: darkMatchaGreen, fontWeight: FontWeight.w600)),
+                  style: OutlinedButton.styleFrom(
+                    side: const BorderSide(color: darkMatchaGreen),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    padding: const EdgeInsets.symmetric(vertical: 10),
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
-        const Divider(),
-ListTile(
-          leading: const Icon(Icons.settings),
-          title: const Text('Settings'),
-          onTap: () {
-            _showSettingsDialog(context);
-          },
+        const SizedBox(height: 16),
+
+        // Info tiles
+        Container(
+          decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(14)),
+          child: Column(
+            children: [
+              _infoTile(Icons.cake_outlined, 'Date of Birth', user.dob.isEmpty ? '—' : user.dob),
+              const Divider(height: 1, indent: 52),
+              _infoTile(Icons.wc_outlined, 'Gender', user.gender.isEmpty ? '—' : user.gender),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+
+        // Settings / logout
+        Container(
+          decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(14)),
+          child: ListTile(
+            leading: const Icon(Icons.logout, color: Colors.red),
+            title: const Text('Logout', style: TextStyle(color: Colors.red, fontWeight: FontWeight.w500)),
+            onTap: () => _confirmLogout(context),
+          ),
         ),
       ],
     );
   }
 
-  void _showSettingsDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: const Text('Settings'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
+  Widget _infoTile(IconData icon, String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      child: Row(
+        children: [
+          Icon(icon, size: 20, color: darkMatchaGreen),
+          const SizedBox(width: 16),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              ListTile(
-                leading: const Icon(Icons.logout, color: Colors.red),
-                title: const Text('Logout'),
-                onTap: () {
-                  Provider.of<AuthModel>(context, listen: false).logout();
-                  Provider.of<OrderStatusModel>(context, listen: false).clearOrders();
-                  Navigator.of(context).pushAndRemoveUntil(
-                    MaterialPageRoute(builder: (context) => const LoginPage()),
-                    (route) => false,
-                  );
-                },
-              ),
+              Text(label, style: TextStyle(fontSize: 11, color: Colors.grey.shade500)),
+              const SizedBox(height: 2),
+              Text(value, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
             ],
           ),
-          actions: [
-            TextButton(
-              child: const Text('Close'),
-              onPressed: () {
-                Navigator.of(context).pop();
-              },
-            ),
-          ],
-        );
-      },
+        ],
+      ),
+    );
+  }
+
+  void _confirmLogout(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Logout'),
+        content: const Text('Are you sure you want to logout?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () {
+              Provider.of<AuthModel>(context, listen: false).logout();
+              Provider.of<OrderStatusModel>(context, listen: false).clearOrders();
+              Navigator.of(context).pushAndRemoveUntil(
+                MaterialPageRoute(builder: (context) => const LoginPage()),
+                (route) => false,
+              );
+            },
+            child: const Text('Logout', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
     );
   }
 }

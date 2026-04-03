@@ -30,7 +30,7 @@ class OrderHistoryPage extends StatelessWidget {
                 margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                 child: ExpansionTile(
                   title: Text('${order.id} - RM ${order.total.toStringAsFixed(2)}'),
-                  subtitle: Text(DateFormat('yyyy-MM-dd – kk:mm').format(order.orderDate)),
+                  subtitle: Text(DateFormat('yyyy-MM-dd – kk:mm').format(order.orderDate.toUtc().add(const Duration(hours: 8)))),
                   children: order.items.map((item) {
                     return ListTile(
                       title: Text(item.name),

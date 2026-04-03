@@ -3,7 +3,6 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:provider/provider.dart';
 import 'firebase_options.dart';
 import 'auth_service.dart';
-import 'home_page.dart';
 import 'otp_verification_page.dart';
 import 'user_model.dart';
 import 'cart_model.dart';
@@ -131,20 +130,6 @@ class _LoginPageState extends State<LoginPage> {
                 child: _isLoading
                   ? const CircularProgressIndicator(color: Colors.white)
                   : const Text('Get OTP', style: TextStyle(color: Colors.white)),
-              ),
-            ),
-            const SizedBox(height: 12),
-            TextButton(
-              onPressed: () {
-                Provider.of<AuthModel>(context, listen: false).loginAsGuest();
-                Provider.of<OrderStatusModel>(context, listen: false).clearOrders();
-                Navigator.of(context).pushReplacement(
-                  MaterialPageRoute(builder: (context) => const HomePage()),
-                );
-              },
-              child: const Text(
-                'Continue as Guest',
-                style: TextStyle(color: Colors.grey),
               ),
             ),
           ],

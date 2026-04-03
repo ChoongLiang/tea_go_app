@@ -2,20 +2,24 @@ import 'package:flutter/foundation.dart';
 import 'package:tea_go_app/cart_model.dart';
 
 class Order {
-  final String id;
+  final String id;           // booking ID for system records
+  final String queueNumber;  // short customer-facing number e.g. "042"
   final List<CartItem> items;
   final double total;
   final DateTime orderDate;
   final String outlet;
+  final String pickupTime;
   int stage; // 1: Placed, 2: Preparing, 3: Ready
 
   Order({
     required this.id,
+    required this.queueNumber,
     required this.items,
     required this.total,
     required this.orderDate,
     required this.outlet,
-    this.stage = 1,
+    this.pickupTime = 'ASAP (~15 min)',
+    this.stage = 2,
   });
 }
 
@@ -33,13 +37,16 @@ class OrderStatusModel extends ChangeNotifier {
   // Get the most recent order to display
   Order? get latestOrder => _orders.isNotEmpty ? _orders.last : null;
 
-  void placeOrder(List<CartItem> items, double total, {String outlet = '', String? orderId}) {
+  void placeOrder(List<CartItem> items, double total, {String outlet = '', String? orderId, String queueNumber = '001', String pickupTime = 'ASAP (~15 min)'}) {
+    final epoch = DateTime(2025).millisecondsSinceEpoch;
     final newOrder = Order(
-      id: orderId ?? 'Order #${_orders.length + 101}',
+      id: orderId ?? '#TG-${(DateTime.now().millisecondsSinceEpoch - epoch).toRadixString(36).toUpperCase()}',
+      queueNumber: queueNumber,
       items: List.from(items),
       total: total,
-      orderDate: DateTime.now(),
+      orderDate: DateTime.now().toUtc(),
       outlet: outlet,
+      pickupTime: pickupTime,
     );
     _orders.add(newOrder);
     notifyListeners();

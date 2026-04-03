@@ -2,13 +2,17 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:tea_go_app/auth_service.dart';
 import 'package:tea_go_app/cart_model.dart';
 import 'package:tea_go_app/home_page.dart';
+import 'package:tea_go_app/location_model.dart';
 import 'package:tea_go_app/order_status_model.dart';
 
 class PaymentSuccessPage extends StatefulWidget {
   final double totalAmount;
-  const PaymentSuccessPage({super.key, required this.totalAmount});
+  final String pickupTime;
+  final String paymentMethod;
+  const PaymentSuccessPage({super.key, required this.totalAmount, this.pickupTime = 'ASAP (~15 min)', this.paymentMethod = 'Touch\'n Go'});
 
   @override
   State<PaymentSuccessPage> createState() => _PaymentSuccessPageState();
@@ -18,15 +22,33 @@ class _PaymentSuccessPageState extends State<PaymentSuccessPage> {
   @override
   void initState() {
     super.initState();
-    
-    var cart = Provider.of<CartModel>(context, listen: false);
-    var orderStatus = Provider.of<OrderStatusModel>(context, listen: false);
 
-    // Create the order
-    orderStatus.placeOrder(cart.items, widget.totalAmount);
-    
-    // Clear the cart
-    cart.clear();
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      var cart = Provider.of<CartModel>(context, listen: false);
+      var orderStatus = Provider.of<OrderStatusModel>(context, listen: false);
+      var location = Provider.of<LocationModel>(context, listen: false);
+
+      final epoch = DateTime(2025).millisecondsSinceEpoch;
+      final orderId = '#TG-${(DateTime.now().millisecondsSinceEpoch - epoch).toRadixString(36).toUpperCase()}';
+      final authService = AuthService();
+      final queueNumber = await authService.getNextQueueNumber();
+
+      // Save to Firestore
+      await authService.saveOrder(
+        orderId: orderId,
+        queueNumber: queueNumber,
+        paymentMethod: widget.paymentMethod,
+        items: cart.items,
+        total: widget.totalAmount,
+        outlet: location.selectedStall,
+      );
+
+      // Update local state with the same ID
+      orderStatus.placeOrder(cart.items, widget.totalAmount, outlet: location.selectedStall, orderId: orderId, queueNumber: queueNumber, pickupTime: widget.pickupTime);
+
+      // Clear the cart
+      cart.clear();
+    });
 
     // Navigate after a delay
     Timer(const Duration(seconds: 3), () {

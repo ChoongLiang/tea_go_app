@@ -49,7 +49,7 @@ class _OrderStatusPageState extends State<OrderStatusPage> {
       ),
       body: Consumer<AuthModel>(
         builder: (context, auth, _) {
-          if (auth.isGuest || !auth.isLoggedIn) {
+          if (!auth.isLoggedIn) {
             return _buildLoginWall(context);
           }
           return _loading
@@ -83,7 +83,7 @@ class _OrderStatusPageState extends State<OrderStatusPage> {
                     if (orderStatus.orders.isNotEmpty) ...[
                       _sectionLabel('Active Orders'),
                       const SizedBox(height: 10),
-                      ...orderStatus.orders.map((o) => _buildLocalOrderCard(context, o, orderStatus)),
+                      ...([...orderStatus.orders]..sort((a, b) => b.orderDate.compareTo(a.orderDate))).map((o) => _buildLocalOrderCard(context, o, orderStatus)),
                       const SizedBox(height: 20),
                     ],
                     if (firestoreOnly.isNotEmpty) ...[
@@ -153,7 +153,7 @@ class _OrderStatusPageState extends State<OrderStatusPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _cardHeader(order.id, _buildStatusBadge(order.stage)),
+          _cardHeader(order.queueNumber, order.id, _buildStatusBadge(order.stage)),
           const Divider(height: 1),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
@@ -167,7 +167,9 @@ class _OrderStatusPageState extends State<OrderStatusPage> {
             'imageUrl': i.imageUrl,
           }).toList()),
           const Divider(height: 1),
-          _cardFooter(order.outlet, order.orderDate.toString(), order.total),
+          _buildPickupTimeRow(order.orderDate, order.pickupTime),
+          const Divider(height: 1),
+          _cardFooter(order.outlet, order.orderDate, order.total),
           if (order.stage <= 3)
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
@@ -204,13 +206,13 @@ class _OrderStatusPageState extends State<OrderStatusPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _cardHeader(order['orderId'] ?? '—', _buildStatusBadge(4)),
+          _cardHeader(order['queueNumber'] ?? '—', order['orderId'] ?? '—', _buildStatusBadge(4)),
           const Divider(height: 1),
           _buildItemsList(items),
           const Divider(height: 1),
           _cardFooter(
             order['outlet'] ?? '',
-            order['createdAt']?.toDate().toString() ?? '',
+            order['createdAt']?.toDate() as DateTime?,
             (order['total'] as num?)?.toDouble() ?? 0,
           ),
         ],
@@ -218,13 +220,20 @@ class _OrderStatusPageState extends State<OrderStatusPage> {
     );
   }
 
-  Widget _cardHeader(String id, Widget badge) {
+  Widget _cardHeader(String queueNumber, String bookingId, Widget badge) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          Text(id, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('#$queueNumber', style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+              Text(bookingId, style: TextStyle(fontSize: 11, color: Colors.grey.shade400)),
+            ],
+          ),
+          const Spacer(),
           badge,
         ],
       ),
@@ -268,14 +277,61 @@ class _OrderStatusPageState extends State<OrderStatusPage> {
     );
   }
 
-  Widget _cardFooter(String outlet, String dateStr, double total) {
-    String time = '';
-    try {
-      final dt = DateTime.parse(dateStr);
-      final h = dt.hour % 12 == 0 ? 12 : dt.hour % 12;
-      final m = dt.minute.toString().padLeft(2, '0');
-      time = '$h:$m ${dt.hour >= 12 ? 'PM' : 'AM'}';
-    } catch (_) {}
+  String _formatGmt8Time(DateTime utcDt) {
+    final dt = utcDt.toUtc().add(const Duration(hours: 8));
+    final h = dt.hour % 12 == 0 ? 12 : dt.hour % 12;
+    final m = dt.minute.toString().padLeft(2, '0');
+    return '$h:$m ${dt.hour >= 12 ? 'PM' : 'AM'}';
+  }
+
+  int _pickupMinutes(String pickupTime) {
+    switch (pickupTime) {
+      case '30 minutes': return 30;
+      case '45 minutes': return 45;
+      case '1 hour': return 60;
+      default: return 15;
+    }
+  }
+
+  Widget _buildPickupTimeRow(DateTime orderDate, String pickupTime) {
+    final readyAt = orderDate.toUtc().add(Duration(hours: 8, minutes: _pickupMinutes(pickupTime)));
+    final h = readyAt.hour % 12 == 0 ? 12 : readyAt.hour % 12;
+    final m = readyAt.minute.toString().padLeft(2, '0');
+    final readyStr = '$h:$m ${readyAt.hour >= 12 ? 'PM' : 'AM'}';
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        decoration: BoxDecoration(
+          color: matchaGreen,
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Row(
+          children: [
+            const Icon(Icons.access_time_rounded, color: darkMatchaGreen, size: 18),
+            const SizedBox(width: 10),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('Estimated Pickup', style: TextStyle(fontSize: 11, color: darkMatchaGreen)),
+                Text('Ready by $readyStr', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: darkMatchaGreen)),
+              ],
+            ),
+            const Spacer(),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(color: darkMatchaGreen, borderRadius: BorderRadius.circular(12)),
+              child: Text(pickupTime, style: const TextStyle(fontSize: 11, color: Colors.white, fontWeight: FontWeight.w600)),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _cardFooter(String outlet, DateTime? dateTime, double total) {
+    final time = dateTime != null ? _formatGmt8Time(dateTime) : '';
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 10, 16, 14),
