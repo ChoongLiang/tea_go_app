@@ -1,5 +1,7 @@
+import 'package:cloud_firestore/cloud_firestore.dart' hide Order;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:shadcn_ui/shadcn_ui.dart';
 import 'package:tea_go_app/auth_service.dart';
 import 'package:tea_go_app/drink_image_widget.dart';
 import 'package:tea_go_app/main.dart';
@@ -27,14 +29,20 @@ class _OrderStatusPageState extends State<OrderStatusPage> {
   }
 
   Future<void> _fetchOrders() async {
-    final orders = await AuthService().loadOrders();
-    if (mounted) setState(() { _firestoreOrders = orders; _loading = false; });
+    final rawOrders = await AuthService().loadOrders();
+    if (!mounted) return;
+    final orders = rawOrders.map((o) {
+      final ts = o['createdAt'];
+      return {...o, 'createdAt': ts is Timestamp ? ts.toDate() : DateTime.now()};
+    }).toList();
+    setState(() { _firestoreOrders = orders; _loading = false; });
+    Provider.of<OrderStatusModel>(context, listen: false).setFirestoreData(orders);
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F5F5),
+      backgroundColor: Colors.white,
       appBar: AppBar(
         title: const Text('Activities', style: TextStyle(fontWeight: FontWeight.bold)),
         backgroundColor: Colors.white,
@@ -81,13 +89,13 @@ class _OrderStatusPageState extends State<OrderStatusPage> {
                   padding: const EdgeInsets.all(16),
                   children: [
                     if (orderStatus.orders.isNotEmpty) ...[
-                      _sectionLabel('Active Orders'),
+                      _sectionLabel(context, 'Active Orders'),
                       const SizedBox(height: 10),
                       ...([...orderStatus.orders]..sort((a, b) => b.orderDate.compareTo(a.orderDate))).map((o) => _buildLocalOrderCard(context, o, orderStatus)),
                       const SizedBox(height: 20),
                     ],
                     if (firestoreOnly.isNotEmpty) ...[
-                      _sectionLabel('Past Orders'),
+                      _sectionLabel(context, 'Past Orders'),
                       const SizedBox(height: 10),
                       ...firestoreOnly.map((o) => _buildFirestoreOrderCard(o)),
                     ],
@@ -101,36 +109,26 @@ class _OrderStatusPageState extends State<OrderStatusPage> {
   }
 
   Widget _buildLoginWall(BuildContext context) {
+    final theme = ShadTheme.of(context);
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(32),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.lock_outline, size: 72, color: Colors.grey),
+            Icon(Icons.lock_outline, size: 64, color: theme.colorScheme.mutedForeground),
             const SizedBox(height: 16),
-            const Text('Sign in to view your orders',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            Text('Sign in to view your orders', style: theme.textTheme.h4),
             const SizedBox(height: 8),
-            const Text('Your order history and active orders will appear here.',
-                textAlign: TextAlign.center,
-                style: TextStyle(color: Colors.grey)),
+            Text('Your order history and active orders will appear here.',
+                textAlign: TextAlign.center, style: theme.textTheme.muted),
             const SizedBox(height: 24),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: () {
-                  Navigator.of(context).pushAndRemoveUntil(
-                    MaterialPageRoute(builder: (_) => const LoginPage()),
-                    (route) => false,
-                  );
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: darkMatchaGreen,
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                ),
-                child: const Text('Sign In', style: TextStyle(color: Colors.white)),
+            ShadButton(
+              onPressed: () => Navigator.of(context).pushAndRemoveUntil(
+                MaterialPageRoute(builder: (_) => const LoginPage()),
+                (route) => false,
               ),
+              child: const Text('Sign In'),
             ),
           ],
         ),
@@ -138,18 +136,15 @@ class _OrderStatusPageState extends State<OrderStatusPage> {
     );
   }
 
-  Widget _sectionLabel(String label) =>
-      Text(label, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.black54));
+  Widget _sectionLabel(BuildContext context, String label) =>
+      Text(label, style: ShadTheme.of(context).textTheme.small.copyWith(fontWeight: FontWeight.bold));
 
   // Card for orders in the current session (has stage info)
   Widget _buildLocalOrderCard(BuildContext context, Order order, OrderStatusModel model) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 14),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 8, offset: const Offset(0, 3))],
-      ),
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 14),
+      child: ShadCard(
+      padding: EdgeInsets.zero,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -159,12 +154,16 @@ class _OrderStatusPageState extends State<OrderStatusPage> {
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
             child: _buildStepper(order.stage),
           ),
+          if (order.stage < 4) _buildQueueAheadRow(order.stage),
           const Divider(height: 1),
           _buildItemsList(order.items.map((i) => {
             'name': i.name,
             'quantity': i.quantity,
             'price': i.price,
             'imageUrl': i.imageUrl,
+            'sugarLevel': i.sugarLevel,
+            'iceLevel': i.iceLevel,
+            'note': i.note,
           }).toList()),
           const Divider(height: 1),
           _buildPickupTimeRow(order.orderDate, order.pickupTime),
@@ -173,19 +172,14 @@ class _OrderStatusPageState extends State<OrderStatusPage> {
           if (order.stage <= 3)
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
-              child: GestureDetector(
-                onTap: () => model.advanceOrderStatus(order),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(vertical: 8),
-                  decoration: BoxDecoration(color: matchaGreen, borderRadius: BorderRadius.circular(8)),
-                  child: const Center(
-                    child: Text('Advance Status (Demo)',
-                        style: TextStyle(fontSize: 12, color: darkMatchaGreen, fontWeight: FontWeight.w600)),
-                  ),
-                ),
+              child: ShadButton.ghost(
+                onPressed: () => model.advanceOrderStatus(order),
+                child: const Text('Advance Status (Demo)',
+                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
               ),
             ),
         ],
+      ),
       ),
     );
   }
@@ -196,13 +190,10 @@ class _OrderStatusPageState extends State<OrderStatusPage> {
         .map((i) => Map<String, dynamic>.from(i as Map))
         .toList();
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 14),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 8, offset: const Offset(0, 3))],
-      ),
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 14),
+      child: ShadCard(
+      padding: EdgeInsets.zero,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -212,10 +203,11 @@ class _OrderStatusPageState extends State<OrderStatusPage> {
           const Divider(height: 1),
           _cardFooter(
             order['outlet'] ?? '',
-            order['createdAt']?.toDate() as DateTime?,
+            order['createdAt'] as DateTime?,
             (order['total'] as num?)?.toDouble() ?? 0,
           ),
         ],
+      ),
       ),
     );
   }
@@ -240,6 +232,37 @@ class _OrderStatusPageState extends State<OrderStatusPage> {
     );
   }
 
+  Widget _buildQueueAheadRow(int stage) {
+    final int ahead = stage == 1 ? 5 : stage == 2 ? 2 : 0;
+    final String label = ahead == 0
+        ? 'Your order is next!'
+        : 'There are $ahead orders ahead of you';
+    final Color color = ahead == 0 ? darkMatchaGreen : Colors.orange.shade700;
+    return Column(
+      children: [
+        const Divider(height: 1),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+          child: Row(
+            children: [
+              Icon(
+                ahead == 0 ? Icons.celebration_outlined : Icons.people_outline,
+                size: 16,
+                color: color,
+              ),
+              const SizedBox(width: 8),
+              Text(label,
+                  style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: color)),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
   Widget _buildItemsList(List<Map<String, dynamic>> items) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
@@ -248,30 +271,56 @@ class _OrderStatusPageState extends State<OrderStatusPage> {
         children: [
           Text('Items', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.grey.shade500)),
           const SizedBox(height: 8),
-          ...items.map((item) => Padding(
-            padding: const EdgeInsets.only(bottom: 6),
-            child: Row(
-              children: [
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(8),
-                  child: DrinkImageWidget(
-                    imageUrl: item['imageUrl'] as String? ?? '',
-                    height: 34,
-                    width: 34,
+          ...items.map((item) {
+            final sugar = item['sugarLevel'] as String? ?? '';
+            final ice = item['iceLevel'] as String? ?? '';
+            final note = item['note'] as String? ?? '';
+            final customParts = [
+              if (sugar.isNotEmpty) sugar,
+              if (ice.isNotEmpty) ice,
+            ];
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: DrinkImageWidget(
+                      imageUrl: item['imageUrl'] as String? ?? '',
+                      height: 40,
+                      width: 40,
+                    ),
                   ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text('${item['name']}  ×${item['quantity']}',
-                      style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
-                ),
-                Text(
-                  'RM ${((item['price'] as num) * (item['quantity'] as num)).toStringAsFixed(2)}',
-                  style: const TextStyle(fontSize: 13, color: Colors.black54),
-                ),
-              ],
-            ),
-          )),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('${item['name']}  ×${item['quantity']}',
+                            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
+                        if (customParts.isNotEmpty) ...[
+                          const SizedBox(height: 3),
+                          Text(customParts.join('  ·  '),
+                              style: TextStyle(fontSize: 11, color: Colors.grey.shade500)),
+                        ],
+                        if (note.isNotEmpty) ...[
+                          const SizedBox(height: 2),
+                          Text('Note: $note',
+                              style: TextStyle(fontSize: 11, color: Colors.grey.shade400,
+                                  fontStyle: FontStyle.italic)),
+                        ],
+                      ],
+                    ),
+                  ),
+                  Text(
+                    'RM ${((item['price'] as num) * (item['quantity'] as num)).toStringAsFixed(2)}',
+                    style: const TextStyle(fontSize: 13, color: Colors.black54),
+                  ),
+                ],
+              ),
+            );
+          }),
         ],
       ),
     );
@@ -357,13 +406,15 @@ class _OrderStatusPageState extends State<OrderStatusPage> {
   }
 
   Widget _buildStatusBadge(int stage) {
-    final config = _stageConfig(stage);
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      decoration: BoxDecoration(color: config['color'] as Color, borderRadius: BorderRadius.circular(20)),
-      child: Text(config['label'] as String,
-          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: config['textColor'] as Color)),
-    );
+    switch (stage) {
+      case 1: return const ShadBadge.secondary(child: Text('Order Placed'));
+      case 2: return ShadBadge.secondary(
+          backgroundColor: Colors.orange.shade50,
+          foregroundColor: Colors.orange.shade700,
+          child: const Text('Preparing'));
+      case 3: return const ShadBadge(child: Text('Ready for Pickup'));
+      default: return const ShadBadge.outline(child: Text('Completed'));
+    }
   }
 
   Widget _buildStepper(int stage) {
@@ -405,12 +456,4 @@ class _OrderStatusPageState extends State<OrderStatusPage> {
     );
   }
 
-  Map<String, dynamic> _stageConfig(int stage) {
-    switch (stage) {
-      case 1: return {'label': 'Order Placed', 'color': Colors.blue.shade50, 'textColor': Colors.blue.shade700};
-      case 2: return {'label': 'Preparing', 'color': Colors.orange.shade50, 'textColor': Colors.orange.shade700};
-      case 3: return {'label': 'Ready for Pickup', 'color': matchaGreen, 'textColor': darkMatchaGreen};
-      default: return {'label': 'Completed', 'color': Colors.grey.shade100, 'textColor': Colors.grey};
-    }
-  }
 }

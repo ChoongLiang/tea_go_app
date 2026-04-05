@@ -1,14 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:shadcn_ui/shadcn_ui.dart';
 import 'package:tea_go_app/cart_model.dart';
 import 'package:tea_go_app/location_model.dart';
+import 'package:tea_go_app/menu_model.dart';
 import 'package:tea_go_app/order_status_model.dart';
 import 'package:tea_go_app/user_model.dart';
 
 const Color _green = Color(0xFF66BB6A);
 const Color _darkGreen = Color(0xFF43A047);
 const Color _lightGreen = Color(0xFFE8F5E9);
-const Color _bg = Color(0xFFF5F5F5);
+const Color _bg = Colors.white;
 
 class DashboardPage extends StatelessWidget {
   final Function(int) onNavigateTo;
@@ -21,11 +23,12 @@ class DashboardPage extends StatelessWidget {
     return 'Good evening';
   }
 
-  Color _queueColor(String queue) {
-    switch (queue) {
-      case 'Busy':     return const Color(0xFFE53935);
-      case 'Moderate': return const Color(0xFFFB8C00);
-      default:         return _green;
+  Color _queueColor(QueueStatus status) {
+    switch (status) {
+      case QueueStatus.notBusy:  return const Color(0xFF4CAF50);
+      case QueueStatus.moderate: return const Color(0xFFFFC107);
+      case QueueStatus.busy:     return const Color(0xFFFF9800);
+      case QueueStatus.veryBusy: return const Color(0xFFF44336);
     }
   }
 
@@ -44,16 +47,16 @@ class DashboardPage extends StatelessWidget {
           children: [
             _buildHeader(firstName),
             _buildSelectedStallCard(context, location),
+            if (orderStatus.latestOrder != null) ...[
+              const SizedBox(height: 12),
+              _buildRecentOrderSection(context, orderStatus.latestOrder!),
+            ],
             const SizedBox(height: 16),
             _buildLoyaltySection(orderStatus),
             const SizedBox(height: 16),
             _buildPromosSection(),
             const SizedBox(height: 16),
-            if (orderStatus.latestOrder != null) ...[
-              _buildRecentOrderSection(context, orderStatus.latestOrder!),
-              const SizedBox(height: 16),
-            ],
-            _buildCategoryShortcuts(),
+            _buildCategoryShortcuts(context),
             const SizedBox(height: 16),
             _buildAllStallsSection(context, location),
             const SizedBox(height: 32),
@@ -65,43 +68,20 @@ class DashboardPage extends StatelessWidget {
 
   // ─── Section A: Header ────────────────────────────────────────────────────
   Widget _buildHeader(String name) {
-    final initial = name.isNotEmpty ? name[0].toUpperCase() : 'U';
-    return Container(
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          colors: [_darkGreen, _green],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-      ),
-      padding: const EdgeInsets.fromLTRB(20, 20, 20, 28),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 20, 20, 4),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  '$_greeting, $name 👋',
-                  style: const TextStyle(
-                      fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white),
-                ),
-                const SizedBox(height: 4),
-                const Text(
-                  'Skip the queue, sip smarter.',
-                  style: TextStyle(fontSize: 13, color: Colors.white70),
-                ),
-              ],
-            ),
+          Text(
+            '$_greeting, $name 👋',
+            style: const TextStyle(
+                fontSize: 22, fontWeight: FontWeight.bold, color: Colors.black87),
           ),
-          const SizedBox(width: 12),
-          CircleAvatar(
-            radius: 20,
-            backgroundColor: Colors.white24,
-            child: Text(initial,
-                style: const TextStyle(
-                    color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
+          const SizedBox(height: 2),
+          const Text(
+            'What are we zessing today?',
+            style: TextStyle(fontSize: 13, color: Colors.black45),
           ),
         ],
       ),
@@ -110,91 +90,111 @@ class DashboardPage extends StatelessWidget {
 
   // ─── Section B: Selected Stall Card ───────────────────────────────────────
   Widget _buildSelectedStallCard(BuildContext context, LocationModel location) {
-    final info = location.selectedStallDetails;
-    final queueColor = _queueColor(info['queue'] ?? 'Quiet');
+    final stall = location.selectedStall;
+    final qColor = _queueColor(stall.queueStatus);
 
-    return Container(
-      margin: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-              color: Colors.black.withValues(alpha: 0.06),
-              blurRadius: 12,
-              offset: const Offset(0, 4))
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              const Icon(Icons.location_on, color: _green, size: 15),
-              const SizedBox(width: 4),
-              const Text('Your Outlet',
-                  style: TextStyle(fontSize: 11, color: Colors.grey)),
-              const Spacer(),
-              GestureDetector(
-                onTap: () => _showStallPicker(context, location),
-                child: const Text('Change',
-                    style: TextStyle(
-                        fontSize: 12,
-                        color: _green,
-                        fontWeight: FontWeight.w600)),
-              ),
-            ],
-          ),
-          const SizedBox(height: 6),
-          Text(location.selectedStall,
-              style:
-                  const TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              _queueBadge(info['queue'] ?? 'Quiet', queueColor),
-              const SizedBox(width: 10),
-              Icon(Icons.access_time_rounded,
-                  size: 13, color: Colors.grey.shade500),
-              const SizedBox(width: 3),
-              Text(info['wait'] ?? '~10 min',
-                  style:
-                      TextStyle(fontSize: 12, color: Colors.grey.shade600)),
-              const SizedBox(width: 10),
-              Icon(Icons.near_me_outlined,
-                  size: 13, color: Colors.grey.shade500),
-              const SizedBox(width: 3),
-              Text(info['distance'] ?? '—',
-                  style:
-                      TextStyle(fontSize: 12, color: Colors.grey.shade600)),
-              const Spacer(),
-              ElevatedButton(
-                onPressed: () => onNavigateTo(1),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: _green,
-                  elevation: 0,
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 14, vertical: 8),
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10)),
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+      child: ShadCard(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Header
+            Row(
+              children: [
+                const Icon(Icons.location_on, color: _green, size: 14),
+                const SizedBox(width: 4),
+                const Text('Your Outlet', style: TextStyle(fontSize: 11, color: Colors.grey)),
+                const Spacer(),
+                GestureDetector(
+                  onTap: () => _showStallPicker(context, location),
+                  child: const Text('Change',
+                      style: TextStyle(fontSize: 12, color: _green, fontWeight: FontWeight.w600)),
                 ),
-                child: const Text('Order Now',
-                    style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold)),
+              ],
+            ),
+            const SizedBox(height: 8),
+            // Stall name
+            Text(stall.name, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 10),
+            // Status + distance
+            Row(
+              children: [
+                _statusChip(stall),
+                const SizedBox(width: 8),
+                Icon(Icons.near_me_outlined, size: 12, color: Colors.grey.shade500),
+                const SizedBox(width: 3),
+                Text(stall.distanceLabel, style: TextStyle(fontSize: 12, color: Colors.grey.shade500)),
+              ],
+            ),
+            if (stall.isOpen) ...[
+              const SizedBox(height: 10),
+              // Queue status
+              Row(
+                children: [
+                  _queueDot(qColor),
+                  const SizedBox(width: 6),
+                  Text(stall.queueLabel,
+                      style: TextStyle(fontSize: 12, color: qColor, fontWeight: FontWeight.w600)),
+                  const SizedBox(width: 4),
+                  Text('· ${stall.ordersInLine} in line',
+                      style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
+                ],
+              ),
+              const SizedBox(height: 6),
+              // Pickup time
+              Row(
+                children: [
+                  Icon(Icons.access_time_rounded, size: 13, color: Colors.grey.shade500),
+                  const SizedBox(width: 5),
+                  Text('Estimated pickup ${stall.estimatedPickupMinutes} min',
+                      style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
+                ],
               ),
             ],
-          ),
+            const SizedBox(height: 14),
+            // CTA
+            SizedBox(
+              width: double.infinity,
+              child: ShadButton(
+                onPressed: stall.isOpen ? () => onNavigateTo(1) : null,
+                child: Text(stall.isOpen ? 'Order Now' : 'Currently Closed'),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _statusChip(StallInfo stall) {
+    final color = stall.isOpen ? _green : Colors.grey;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: stall.isOpen ? _lightGreen : Colors.grey.shade100,
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(width: 6, height: 6, decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
+          const SizedBox(width: 5),
+          Text(stall.isOpen ? 'Open' : 'Closed',
+              style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: color)),
         ],
       ),
     );
   }
 
-  Widget _queueBadge(String label, Color color) {
+  Widget _queueDot(Color color) =>
+      Container(width: 8, height: 8, decoration: BoxDecoration(color: color, shape: BoxShape.circle));
+
+  Widget _queueBadge(StallInfo stall) {
+    final color = _queueColor(stall.queueStatus);
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(20),
@@ -203,17 +203,9 @@ class DashboardPage extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Container(
-              width: 6,
-              height: 6,
-              decoration:
-                  BoxDecoration(color: color, shape: BoxShape.circle)),
+          Container(width: 6, height: 6, decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
           const SizedBox(width: 5),
-          Text(label,
-              style: TextStyle(
-                  fontSize: 11,
-                  color: color,
-                  fontWeight: FontWeight.w600)),
+          Text(stall.queueLabel, style: TextStyle(fontSize: 11, color: color, fontWeight: FontWeight.w600)),
         ],
       ),
     );
@@ -222,47 +214,37 @@ class DashboardPage extends StatelessWidget {
   void _showStallPicker(BuildContext context, LocationModel location) {
     showModalBottomSheet(
       context: context,
-      shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
       builder: (_) => Padding(
         padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Select Outlet',
-                style:
-                    TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            const Text('Select Outlet', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             const SizedBox(height: 12),
-            ...location.stalls.map((stall) {
-              final info = location.stallDetails[stall] ?? {};
-              final qColor =
-                  _queueColor(info['queue'] ?? 'Quiet');
-              return ListTile(
-                leading:
-                    const Icon(Icons.store_outlined, color: _green),
-                title: Text(stall,
-                    style: const TextStyle(
-                        fontSize: 13, fontWeight: FontWeight.w500)),
-                subtitle: Row(
-                  children: [
-                    _queueBadge(info['queue'] ?? 'Quiet', qColor),
-                    const SizedBox(width: 8),
-                    Text(info['wait'] ?? '',
-                        style: TextStyle(
-                            fontSize: 11,
-                            color: Colors.grey.shade500)),
-                  ],
-                ),
-                trailing: location.selectedStall == stall
-                    ? const Icon(Icons.check_circle, color: _green)
-                    : null,
-                onTap: () {
-                  location.selectStall(stall);
-                  Navigator.pop(context);
-                },
-              );
-            }),
+            ...location.stalls.map((stall) => ListTile(
+              leading: Icon(Icons.store_outlined, color: stall.isOpen ? _green : Colors.grey),
+              title: Text(stall.name, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
+              subtitle: Row(
+                children: [
+                  if (stall.isOpen) ...[
+                    _queueBadge(stall),
+                    const SizedBox(width: 6),
+                    Text('${stall.ordersInLine} in line · ~${stall.estimatedPickupMinutes} min',
+                        style: TextStyle(fontSize: 11, color: Colors.grey.shade500)),
+                  ] else
+                    Text('Closed', style: TextStyle(fontSize: 11, color: Colors.grey.shade400)),
+                ],
+              ),
+              trailing: location.selectedStall.id == stall.id
+                  ? const Icon(Icons.check_circle, color: _green)
+                  : null,
+              onTap: () {
+                location.selectStall(stall);
+                Navigator.pop(context);
+              },
+            )),
           ],
         ),
       ),
@@ -271,23 +253,13 @@ class DashboardPage extends StatelessWidget {
 
   // ─── Section C: Loyalty Stamps ────────────────────────────────────────────
   Widget _buildLoyaltySection(OrderStatusModel orderStatus) {
-    final stamps = orderStatus.orders.length % 10;
+    final stamps = orderStatus.totalOrderCount % 10;
     final remaining = 10 - stamps;
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: Container(
+      child: ShadCard(
         padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: [
-            BoxShadow(
-                color: Colors.black.withValues(alpha: 0.05),
-                blurRadius: 10,
-                offset: const Offset(0, 4))
-          ],
-        ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -330,9 +302,7 @@ class DashboardPage extends StatelessWidget {
                     color: filled ? _green : _lightGreen,
                     shape: BoxShape.circle,
                     border: Border.all(
-                        color: filled
-                            ? _green
-                            : Colors.grey.shade200,
+                        color: filled ? _green : Colors.grey.shade200,
                         width: 1.5),
                   ),
                   child: Icon(
@@ -436,90 +406,89 @@ class DashboardPage extends StatelessWidget {
   Widget _buildRecentOrderSection(BuildContext context, Order order) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: Container(
+      child: ShadCard(
         padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: [
-            BoxShadow(
-                color: Colors.black.withValues(alpha: 0.05),
-                blurRadius: 10,
-                offset: const Offset(0, 4))
-          ],
-        ),
-        child: Row(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Container(
-              width: 42,
-              height: 42,
-              decoration: BoxDecoration(
-                  color: _lightGreen,
-                  borderRadius: BorderRadius.circular(12)),
-              child:
-                  const Icon(Icons.replay_rounded, color: _green, size: 22),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text('Order Again?',
-                      style: TextStyle(
-                          fontSize: 13, fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 2),
-                  Text(
-                    order.items.map((i) => i.name).join(', '),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                        fontSize: 12, color: Colors.grey.shade500),
+            Row(
+              children: [
+                Container(
+                  width: 42,
+                  height: 42,
+                  decoration: BoxDecoration(
+                      color: _lightGreen,
+                      borderRadius: BorderRadius.circular(12)),
+                  child: const Icon(Icons.replay_rounded, color: _green, size: 22),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('Order Again?',
+                          style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+                      const SizedBox(height: 2),
+                      Text(
+                        order.items.map((i) => i.name).join(', '),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
+                      ),
+                      Text('RM ${order.total.toStringAsFixed(2)}',
+                          style: const TextStyle(
+                              fontSize: 12, color: _green, fontWeight: FontWeight.w600)),
+                    ],
                   ),
-                  Text('RM ${order.total.toStringAsFixed(2)}',
-                      style: const TextStyle(
-                          fontSize: 12,
-                          color: _green,
-                          fontWeight: FontWeight.w600)),
+                ),
+                const SizedBox(width: 10),
+                ShadButton.outline(
+                  onPressed: () {
+                    final cart = Provider.of<CartModel>(context, listen: false);
+                    final location = Provider.of<LocationModel>(context, listen: false);
+
+                    // Restore the outlet from this order
+                    if (order.outlet.isNotEmpty) {
+                      final match = location.stalls.where(
+                        (s) => s.name == order.outlet,
+                      );
+                      if (match.isNotEmpty) location.selectStall(match.first);
+                    }
+
+                    for (final item in order.items) {
+                      cart.add(CartItem(
+                        name: item.name,
+                        price: item.price,
+                        sugarLevel: item.sugarLevel,
+                        iceLevel: item.iceLevel,
+                        quantity: item.quantity,
+                        note: item.note,
+                        imageUrl: item.imageUrl,
+                      ));
+                    }
+                    onNavigateTo(1);
+                    ShadToaster.of(context).show(
+                      const ShadToast(description: Text('Items added to cart')),
+                    );
+                  },
+                  size: ShadButtonSize.sm,
+                  child: const Text('Reorder'),
+                ),
+              ],
+            ),
+            if (order.outlet.isNotEmpty) ...[
+              const SizedBox(height: 10),
+              Divider(height: 1, color: Colors.grey.shade100),
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  Icon(Icons.store_outlined, size: 13, color: Colors.grey.shade400),
+                  const SizedBox(width: 5),
+                  Text(order.outlet,
+                      style: TextStyle(fontSize: 12, color: Colors.grey.shade500)),
                 ],
               ),
-            ),
-            const SizedBox(width: 10),
-            OutlinedButton(
-              onPressed: () {
-                final cart = Provider.of<CartModel>(context, listen: false);
-                for (final item in order.items) {
-                  cart.add(CartItem(
-                    name: item.name,
-                    price: item.price,
-                    sugarLevel: item.sugarLevel,
-                    iceLevel: item.iceLevel,
-                    quantity: item.quantity,
-                    note: item.note,
-                    imageUrl: item.imageUrl,
-                  ));
-                }
-                onNavigateTo(1);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Items added to cart'),
-                    backgroundColor: _green,
-                    behavior: SnackBarBehavior.floating,
-                    duration: Duration(seconds: 2),
-                  ),
-                );
-              },
-              style: OutlinedButton.styleFrom(
-                foregroundColor: _green,
-                side: const BorderSide(color: _green),
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 14, vertical: 8),
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10)),
-              ),
-              child: const Text('Reorder',
-                  style: TextStyle(
-                      fontSize: 12, fontWeight: FontWeight.bold)),
-            ),
+            ],
           ],
         ),
       ),
@@ -527,7 +496,7 @@ class DashboardPage extends StatelessWidget {
   }
 
   // ─── Section F: Category Shortcuts ───────────────────────────────────────
-  Widget _buildCategoryShortcuts() {
+  Widget _buildCategoryShortcuts(BuildContext context) {
     final categories = [
       {'label': 'Milk Tea',    'icon': Icons.local_cafe_outlined},
       {'label': 'Fruit Tea',   'icon': Icons.local_drink_outlined},
@@ -554,7 +523,10 @@ class DashboardPage extends StatelessWidget {
             itemBuilder: (_, i) {
               final cat = categories[i];
               return GestureDetector(
-                onTap: () => onNavigateTo(1),
+                onTap: () {
+                  context.read<MenuModel>().setCategory(cat['label'] as String);
+                  onNavigateTo(1);
+                },
                 child: Container(
                   width: 82,
                   decoration: BoxDecoration(
@@ -590,22 +562,16 @@ class DashboardPage extends StatelessWidget {
   }
 
   // ─── Section G: All Stalls ────────────────────────────────────────────────
-  Widget _buildAllStallsSection(
-      BuildContext context, LocationModel location) {
+  Widget _buildAllStallsSection(BuildContext context, LocationModel location) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Padding(
           padding: EdgeInsets.fromLTRB(16, 0, 16, 12),
-          child: Text('All Outlets',
-              style:
-                  TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+          child: Text('All Outlets', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
         ),
         ...location.stalls.map((stall) {
-          final info = location.stallDetails[stall] ??
-              {'queue': 'Quiet', 'wait': '~5 min', 'distance': '—'};
-          final isSelected = location.selectedStall == stall;
-          final qColor = _queueColor(info['queue'] ?? 'Quiet');
+          final isSelected = location.selectedStall.id == stall.id;
 
           return GestureDetector(
             onTap: () {
@@ -618,31 +584,18 @@ class DashboardPage extends StatelessWidget {
               decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(14),
-                border: isSelected
-                    ? Border.all(color: _green, width: 1.5)
-                    : null,
-                boxShadow: [
-                  BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.04),
-                      blurRadius: 8,
-                      offset: const Offset(0, 2))
-                ],
+                border: isSelected ? Border.all(color: _green, width: 1.5) : null,
+                boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 8, offset: const Offset(0, 2))],
               ),
               child: Row(
                 children: [
                   Container(
-                    width: 42,
-                    height: 42,
+                    width: 42, height: 42,
                     decoration: BoxDecoration(
-                      color: isSelected
-                          ? _lightGreen
-                          : Colors.grey.shade100,
+                      color: isSelected ? _lightGreen : Colors.grey.shade100,
                       borderRadius: BorderRadius.circular(10),
                     ),
-                    child: Icon(Icons.store_outlined,
-                        color:
-                            isSelected ? _green : Colors.grey.shade400,
-                        size: 20),
+                    child: Icon(Icons.store_outlined, color: isSelected ? _green : Colors.grey.shade400, size: 20),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
@@ -652,47 +605,45 @@ class DashboardPage extends StatelessWidget {
                         Row(
                           children: [
                             Expanded(
-                              child: Text(stall,
-                                  style: const TextStyle(
-                                      fontSize: 13,
-                                      fontWeight: FontWeight.w600)),
+                              child: Text(stall.name,
+                                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
                             ),
                             if (isSelected)
                               Container(
-                                padding:
-                                    const EdgeInsets.symmetric(
-                                        horizontal: 8, vertical: 2),
-                                decoration: BoxDecoration(
-                                    color: _lightGreen,
-                                    borderRadius:
-                                        BorderRadius.circular(8)),
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                decoration: BoxDecoration(color: _lightGreen, borderRadius: BorderRadius.circular(8)),
                                 child: const Text('Selected',
-                                    style: TextStyle(
-                                        fontSize: 10,
-                                        color: _green,
-                                        fontWeight: FontWeight.w600)),
+                                    style: TextStyle(fontSize: 10, color: _green, fontWeight: FontWeight.w600)),
                               ),
                           ],
                         ),
-                        const SizedBox(height: 5),
+                        const SizedBox(height: 6),
                         Row(
                           children: [
-                            _queueBadge(info['queue'] ?? 'Quiet', qColor),
+                            _statusChip(stall),
                             const SizedBox(width: 8),
-                            Text(
-                              '${info['wait']}  ·  ${info['distance']}',
-                              style: TextStyle(
-                                  fontSize: 11,
-                                  color: Colors.grey.shade500),
-                            ),
+                            Icon(Icons.near_me_outlined, size: 11, color: Colors.grey.shade400),
+                            const SizedBox(width: 3),
+                            Text(stall.distanceLabel,
+                                style: TextStyle(fontSize: 11, color: Colors.grey.shade500)),
                           ],
                         ),
+                        if (stall.isOpen) ...[
+                          const SizedBox(height: 5),
+                          Row(
+                            children: [
+                              _queueBadge(stall),
+                              const SizedBox(width: 6),
+                              Text('${stall.ordersInLine} in line · ~${stall.estimatedPickupMinutes} min',
+                                  style: TextStyle(fontSize: 11, color: Colors.grey.shade500)),
+                            ],
+                          ),
+                        ],
                       ],
                     ),
                   ),
                   const SizedBox(width: 8),
-                  const Icon(Icons.chevron_right,
-                      color: Colors.grey, size: 18),
+                  const Icon(Icons.chevron_right, color: Colors.grey, size: 18),
                 ],
               ),
             ),

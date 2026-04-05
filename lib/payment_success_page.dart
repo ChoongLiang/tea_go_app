@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:shadcn_ui/shadcn_ui.dart';
 import 'package:tea_go_app/auth_service.dart';
 import 'package:tea_go_app/cart_model.dart';
 import 'package:tea_go_app/home_page.dart';
@@ -40,11 +41,11 @@ class _PaymentSuccessPageState extends State<PaymentSuccessPage> {
         paymentMethod: widget.paymentMethod,
         items: cart.items,
         total: widget.totalAmount,
-        outlet: location.selectedStall,
+        outlet: location.selectedStallName,
       );
 
       // Update local state with the same ID
-      orderStatus.placeOrder(cart.items, widget.totalAmount, outlet: location.selectedStall, orderId: orderId, queueNumber: queueNumber, pickupTime: widget.pickupTime);
+      orderStatus.placeOrder(cart.items, widget.totalAmount, outlet: location.selectedStallName, orderId: orderId, queueNumber: queueNumber, pickupTime: widget.pickupTime);
 
       // Clear the cart
       cart.clear();
@@ -65,14 +66,18 @@ class _PaymentSuccessPageState extends State<PaymentSuccessPage> {
 
   @override
   Widget build(BuildContext context) {
-    return const Scaffold(
+    final theme = ShadTheme.of(context);
+    return Scaffold(
+      backgroundColor: theme.colorScheme.background,
       body: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.check_circle, color: Colors.green, size: 100),
-            SizedBox(height: 20),
-            Text('Payment Successful!', style: TextStyle(fontSize: 24)),
+            Icon(Icons.check_circle_rounded, color: theme.colorScheme.primary, size: 100),
+            const SizedBox(height: 20),
+            Text('Payment Successful!', style: theme.textTheme.h3),
+            const SizedBox(height: 8),
+            Text('Redirecting to your orders…', style: theme.textTheme.muted),
           ],
         ),
       ),

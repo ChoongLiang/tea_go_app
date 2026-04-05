@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:shadcn_ui/shadcn_ui.dart';
 import 'package:tea_go_app/cart_model.dart';
 import 'package:tea_go_app/drink_image_widget.dart';
 import 'package:tea_go_app/location_model.dart';
@@ -19,8 +20,14 @@ class _ShoppingCartPageState extends State<ShoppingCartPage> {
   String _selectedPickupTime = 'ASAP (~15 min)';
   String _selectedPayment = 'Touch \'n Go';
   final TextEditingController _promoController = TextEditingController();
+  final TextEditingController _customTipController = TextEditingController();
   String? _appliedPromo;
   double _discount = 0;
+  int _tipIndex = 0; // 0 = No Tip
+  double _tipAmount = 0;
+
+  static const List<double> _tipPresets = [0, 0.50, 1.00, 2.00];
+  static const List<String> _tipLabels = ['No Tip', 'RM 0.50', 'RM 1.00', 'RM 2.00', 'Custom'];
 
   final List<String> _pickupTimes = [
     'ASAP (~15 min)',
@@ -44,6 +51,7 @@ class _ShoppingCartPageState extends State<ShoppingCartPage> {
   @override
   void dispose() {
     _promoController.dispose();
+    _customTipController.dispose();
     super.dispose();
   }
 
@@ -54,26 +62,24 @@ class _ShoppingCartPageState extends State<ShoppingCartPage> {
         _appliedPromo = code;
         _discount = _promoCodes[code]!;
       });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Promo applied! ${(_discount * 100).toInt()}% off'),
-          backgroundColor: darkMatchaGreen,
-        ),
+      ShadToaster.of(context).show(
+        ShadToast(description: Text('${(_discount * 100).toInt()}% off applied!')),
       );
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Invalid promo code'), backgroundColor: Colors.red),
+      ShadToaster.of(context).show(
+        const ShadToast.destructive(description: Text('Invalid promo code')),
       );
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final theme = ShadTheme.of(context);
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F5F5),
+      backgroundColor: theme.colorScheme.background,
       appBar: AppBar(
         title: const Text('My Cart', style: TextStyle(fontWeight: FontWeight.bold)),
-        backgroundColor: Colors.white,
+        backgroundColor: theme.colorScheme.background,
         elevation: 0,
         foregroundColor: Colors.black87,
       ),
@@ -97,7 +103,7 @@ class _ShoppingCartPageState extends State<ShoppingCartPage> {
           final afterDiscount = subtotal - discountAmount;
           final sst = afterDiscount * 0.06;
           final serviceTax = afterDiscount * 0.10;
-          final grandTotal = afterDiscount + sst + serviceTax;
+          final grandTotal = afterDiscount + sst + serviceTax + _tipAmount;
           final roundedTotal = (grandTotal * 20).round() / 20;
           final rounding = roundedTotal - grandTotal;
 
@@ -117,6 +123,8 @@ class _ShoppingCartPageState extends State<ShoppingCartPage> {
                     const SizedBox(height: 12),
                     _buildPaymentCard(),
                     const SizedBox(height: 12),
+                    _buildTipCard(),
+                    const SizedBox(height: 12),
                     _buildPriceSummary(subtotal, discountAmount, sst, serviceTax, rounding, roundedTotal),
                     const SizedBox(height: 8),
                   ],
@@ -131,11 +139,7 @@ class _ShoppingCartPageState extends State<ShoppingCartPage> {
   }
 
   Widget _buildSectionCard({required String title, required Widget child, IconData? icon}) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
-      ),
+    return ShadCard(
       padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -160,7 +164,7 @@ class _ShoppingCartPageState extends State<ShoppingCartPage> {
     return Consumer<LocationModel>(
       builder: (context, location, _) {
         return _buildSectionCard(
-          title: 'Pickup Outlet',
+          title: 'Pickup Stall',
           icon: Icons.store_outlined,
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -173,10 +177,10 @@ class _ShoppingCartPageState extends State<ShoppingCartPage> {
                     child: const Icon(Icons.location_on, color: darkMatchaGreen, size: 20),
                   ),
                   const SizedBox(width: 12),
-                  Text(location.selectedStall, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
+                  Text(location.selectedStallName, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
                 ],
               ),
-              TextButton(
+              ShadButton.ghost(
                 onPressed: () => _showLocationDialog(context, location),
                 child: const Text('Change', style: TextStyle(color: darkMatchaGreen)),
               ),
@@ -202,8 +206,8 @@ class _ShoppingCartPageState extends State<ShoppingCartPage> {
               const SizedBox(height: 12),
               ...locationModel.stalls.map((stall) => ListTile(
                 leading: const Icon(Icons.store_outlined, color: darkMatchaGreen),
-                title: Text(stall),
-                trailing: locationModel.selectedStall == stall
+                title: Text(stall.name),
+                trailing: locationModel.selectedStall.id == stall.id
                     ? const Icon(Icons.check_circle, color: darkMatchaGreen)
                     : null,
                 onTap: () {
@@ -266,7 +270,6 @@ class _ShoppingCartPageState extends State<ShoppingCartPage> {
       padding: const EdgeInsets.only(bottom: 12),
       child: Row(
         children: [
-          // Item icon
           ClipRRect(
             borderRadius: BorderRadius.circular(10),
             child: DrinkImageWidget(
@@ -276,7 +279,6 @@ class _ShoppingCartPageState extends State<ShoppingCartPage> {
             ),
           ),
           const SizedBox(width: 12),
-          // Name & customization
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -297,7 +299,6 @@ class _ShoppingCartPageState extends State<ShoppingCartPage> {
               ],
             ),
           ),
-          // Price on top, qty controls on bottom
           Column(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
@@ -350,40 +351,15 @@ class _ShoppingCartPageState extends State<ShoppingCartPage> {
           Row(
             children: [
               Expanded(
-                child: TextField(
+                child: ShadInput(
                   controller: _promoController,
-                  textCapitalization: TextCapitalization.characters,
-                  decoration: InputDecoration(
-                    hintText: 'Enter promo code',
-                    hintStyle: TextStyle(color: Colors.grey.shade400, fontSize: 13),
-                    filled: true,
-                    fillColor: Colors.grey.shade50,
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10),
-                      borderSide: BorderSide(color: Colors.grey.shade300),
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10),
-                      borderSide: BorderSide(color: Colors.grey.shade300),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10),
-                      borderSide: const BorderSide(color: darkMatchaGreen),
-                    ),
-                  ),
+                  placeholder: const Text('Enter promo code'),
                 ),
               ),
               const SizedBox(width: 10),
-              ElevatedButton(
+              ShadButton.outline(
                 onPressed: _applyPromo,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: darkMatchaGreen,
-                  elevation: 0,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                ),
-                child: const Text('Apply', style: TextStyle(color: Colors.white)),
+                child: const Text('Apply'),
               ),
             ],
           ),
@@ -462,9 +438,98 @@ class _ShoppingCartPageState extends State<ShoppingCartPage> {
     );
   }
 
+  Widget _buildTipCard() {
+    final isCustom = _tipIndex == _tipLabels.length - 1;
+    return _buildSectionCard(
+      title: 'Add a Tip',
+      icon: Icons.volunteer_activism_outlined,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Show some love to our crew ☕',
+            style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
+          ),
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: List.generate(_tipLabels.length, (i) {
+              final selected = _tipIndex == i;
+              return GestureDetector(
+                onTap: () {
+                  setState(() {
+                    _tipIndex = i;
+                    if (i < _tipPresets.length) {
+                      _tipAmount = _tipPresets[i];
+                      _customTipController.clear();
+                    } else {
+                      _tipAmount = 0;
+                    }
+                  });
+                },
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: selected ? darkMatchaGreen : Colors.grey.shade100,
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                        color: selected ? darkMatchaGreen : Colors.grey.shade300),
+                  ),
+                  child: Text(
+                    _tipLabels[i],
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500,
+                      color: selected ? Colors.white : Colors.black87,
+                    ),
+                  ),
+                ),
+              );
+            }),
+          ),
+          if (isCustom) ...[
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: ShadInput(
+                    controller: _customTipController,
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    placeholder: const Text('Enter amount (RM)'),
+                    leading: const Padding(
+                      padding: EdgeInsets.only(right: 4),
+                      child: Text('RM', style: TextStyle(color: Colors.grey)),
+                    ),
+                    onChanged: (val) {
+                      final parsed = double.tryParse(val) ?? 0;
+                      setState(() => _tipAmount = parsed);
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ],
+          if (_tipAmount > 0 && !isCustom) ...[
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                const Icon(Icons.favorite_rounded, size: 14, color: darkMatchaGreen),
+                const SizedBox(width: 6),
+                Text(
+                  'Thanks for the love! RM ${_tipAmount.toStringAsFixed(2)} tip added.',
+                  style: const TextStyle(fontSize: 12, color: darkMatchaGreen, fontWeight: FontWeight.w500),
+                ),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
   Widget _buildPriceSummary(double subtotal, double discountAmount, double sst, double serviceTax, double rounding, double roundedTotal) {
-    return Container(
-      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(14)),
+    return ShadCard(
       padding: const EdgeInsets.all(16),
       child: Column(
         children: [
@@ -477,6 +542,10 @@ class _ShoppingCartPageState extends State<ShoppingCartPage> {
           _summaryRow('SST (6%)', sst),
           const SizedBox(height: 8),
           _summaryRow('Service Tax (10%)', serviceTax),
+          if (_tipAmount > 0) ...[
+            const SizedBox(height: 8),
+            _summaryRow('Tip', _tipAmount, valueColor: darkMatchaGreen),
+          ],
           const SizedBox(height: 8),
           _summaryRow('Rounding', rounding),
           const Padding(
@@ -515,24 +584,22 @@ class _ShoppingCartPageState extends State<ShoppingCartPage> {
     return Container(
       padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: ShadTheme.of(context).colorScheme.background,
         boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.06), blurRadius: 10, offset: const Offset(0, -4))],
       ),
       child: SizedBox(
         width: double.infinity,
-        height: 52,
-        child: ElevatedButton(
-          style: ElevatedButton.styleFrom(
-            backgroundColor: darkMatchaGreen,
-            elevation: 0,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-          ),
+        child: ShadButton(
           onPressed: () {
-            Navigator.push(context, MaterialPageRoute(builder: (_) => PaymentSuccessPage(totalAmount: payable, pickupTime: _selectedPickupTime, paymentMethod: _selectedPayment)));
+            Navigator.push(context, MaterialPageRoute(builder: (_) => PaymentSuccessPage(
+              totalAmount: payable,
+              pickupTime: _selectedPickupTime,
+              paymentMethod: _selectedPayment,
+            )));
           },
           child: Text(
             'Proceed to Pay  ·  RM ${payable.toStringAsFixed(2)}',
-            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
+            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
           ),
         ),
       ),

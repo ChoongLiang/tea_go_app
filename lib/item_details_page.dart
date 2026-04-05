@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:shadcn_ui/shadcn_ui.dart';
 import 'package:tea_go_app/cart_model.dart';
 import 'package:tea_go_app/drink_image_widget.dart';
 
@@ -108,8 +109,8 @@ class _ItemDetailsPageState extends State<ItemDetailsPage> {
       actions: [
         GestureDetector(
           onTap: () {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Share link copied!')),
+            ShadToaster.of(context).show(
+              const ShadToast(description: Text('Share link copied!')),
             );
           },
           child: Container(
@@ -290,40 +291,17 @@ class _ItemDetailsPageState extends State<ItemDetailsPage> {
   }
 
   Widget _buildNoteField() {
-    return TextField(
+    return ShadInput(
       controller: _noteController,
       maxLines: 3,
-      decoration: InputDecoration(
-        hintText: 'e.g. Less sweet, no pearls, extra toppings...',
-        hintStyle: TextStyle(color: Colors.grey.shade400, fontSize: 13),
-        filled: true,
-        fillColor: Colors.grey.shade50,
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: Colors.grey.shade300),
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: Colors.grey.shade300),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: darkMatchaGreen),
-        ),
-      ),
+      placeholder: const Text('e.g. Less sweet, no pearls, extra toppings...'),
     );
   }
 
   Widget _buildAddToCartButton() {
     return SizedBox(
       width: double.infinity,
-      height: 52,
-      child: ElevatedButton(
-        style: ElevatedButton.styleFrom(
-          backgroundColor: darkMatchaGreen,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-          elevation: 0,
-        ),
+      child: ShadButton(
         onPressed: () {
           final cart = Provider.of<CartModel>(context, listen: false);
           cart.add(CartItem(
@@ -337,10 +315,7 @@ class _ItemDetailsPageState extends State<ItemDetailsPage> {
           ));
           Navigator.pop(context);
         },
-        child: const Text(
-          'Add to Cart',
-          style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: Colors.white),
-        ),
+        child: const Text('Add to Cart', style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold)),
       ),
     );
   }
